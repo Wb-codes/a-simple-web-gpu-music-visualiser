@@ -573,17 +573,30 @@ async function initAudio() {
             showAudioSourceSelector();
             return true;
         } else {
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            statusEl.textContent = 'Audio: Select screen to share';
+            statusEl.className = '';
+            
+            const stream = await navigator.mediaDevices.getDisplayMedia({ 
+                video: true, 
+                audio: true 
+            });
+            
             const audioTrack = stream.getAudioTracks()[0];
             stream.getVideoTracks().forEach(t => t.stop());
             
             if (!audioTrack) {
-                statusEl.textContent = 'Audio: No track';
+                statusEl.textContent = 'Audio: No audio - check "Share audio" when sharing';
                 statusEl.className = 'error';
+                stream.getTracks().forEach(t => t.stop());
                 return false;
             }
 
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+            
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 512;
             analyser.smoothingTimeConstant = 0.75;
@@ -597,8 +610,13 @@ async function initAudio() {
         }
     } catch (err) {
         console.error('Audio error:', err);
-        document.getElementById('audio-status').textContent = 'Audio: ' + err.message;
-        document.getElementById('audio-status').className = 'error';
+        const statusEl = document.getElementById('audio-status');
+        if (err.name === 'NotAllowedError') {
+            statusEl.textContent = 'Audio: Cancelled - click a scene to retry';
+        } else {
+            statusEl.textContent = 'Audio: ' + err.message;
+        }
+        statusEl.className = 'error';
         return false;
     }
 }
