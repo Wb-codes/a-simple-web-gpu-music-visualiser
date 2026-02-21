@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spout Output</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            overflow: hidden; 
+            background: #14171a; 
+            width: 1920px;
+            height: 1080px;
+        }
+        canvas { display: block; }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./node_modules/three/build/three.webgpu.js",
+            "three/webgpu": "./node_modules/three/build/three.webgpu.js",
+            "three/tsl": "./node_modules/three/build/three.tsl.js",
+            "three/addons/": "./node_modules/three/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <script type="module" src="spout-renderer.js"></script>
+</body>
+</html>

@@ -65,7 +65,11 @@ const settings = {
     
     // Controls
     autoRotate: { value: true, label: "Auto Rotate" },
-    autoRotateSpeed: { value: 2, min: -10, max: 10, label: "Rotate Speed" }
+    autoRotateSpeed: { value: 2, min: -10, max: 10, label: "Rotate Speed" },
+    
+    // Spout output
+    spoutEnabled: { value: false, label: "Enable Spout" },
+    spoutSenderName: { value: "Music Visualizer", label: "Sender Name" }
 };
 
 // Linked Particles Scene
@@ -549,34 +553,193 @@ function updateSkinningScene(delta) {
 }
 
 // Audio
+let audioSources = [];
+let selectedAudioSource = null;
+
 async function initAudio() {
     try {
         const statusEl = document.getElementById('audio-status');
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        const audioTrack = stream.getAudioTracks()[0];
-        stream.getVideoTracks().forEach(t => t.stop());
         
-        if (!audioTrack) {
-            statusEl.textContent = 'Audio: No track';
-            statusEl.className = 'error';
-            return false;
+        if (window.isElectron && window.electronAPI) {
+            const sources = await window.electronAPI.getAudioSources();
+            audioSources = sources.filter(s => s.name && !s.name.includes('Music Visualizer'));
+            
+            if (audioSources.length === 0) {
+                statusEl.textContent = 'Audio: No sources found';
+                statusEl.className = 'error';
+                return false;
+            }
+            
+            showAudioSourceSelector();
+            return true;
+        } else {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            const audioTrack = stream.getAudioTracks()[0];
+            stream.getVideoTracks().forEach(t => t.stop());
+            
+            if (!audioTrack) {
+                statusEl.textContent = 'Audio: No track';
+                statusEl.className = 'error';
+                return false;
+            }
+
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 512;
+            analyser.smoothingTimeConstant = 0.75;
+            const source = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+            source.connect(analyser);
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            statusEl.textContent = 'Audio: Active';
+            statusEl.className = 'active';
+            return true;
         }
-
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.75;
-        const source = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
-        source.connect(analyser);
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-        statusEl.textContent = 'Audio: Active';
-        statusEl.className = 'active';
-        return true;
     } catch (err) {
         console.error('Audio error:', err);
         document.getElementById('audio-status').textContent = 'Audio: ' + err.message;
         document.getElementById('audio-status').className = 'error';
+        return false;
+    }
+}
+
+function showAudioSourceSelector() {
+    let selector = document.getElementById('audio-selector');
+    if (!selector) {
+        selector = document.createElement('div');
+        selector.id = 'audio-selector';
+        selector.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 23, 26, 0.98);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 2000;
+            max-width: 400px;
+            max-height: 60vh;
+            overflow-y: auto;
+            border: 1px solid #444;
+        `;
+        document.body.appendChild(selector);
+    }
+    
+    selector.innerHTML = `
+        <h3 style="color: #fff; margin-bottom: 15px; font-size: 16px;">Select Audio Source</h3>
+        <div style="color: #888; font-size: 12px; margin-bottom: 10px;">
+            Choose a window/screen to capture audio from:
+        </div>
+        <div id="audio-source-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        <button id="audio-cancel" style="
+            margin-top: 15px;
+            padding: 8px 16px;
+            background: #444;
+            border: none;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        ">Cancel</button>
+    `;
+    
+    const list = document.getElementById('audio-source-list');
+    audioSources.forEach(source => {
+        const item = document.createElement('div');
+        item.style.cssText = `
+            padding: 10px;
+            background: #2a2d30;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s;
+        `;
+        item.onmouseenter = () => item.style.background = '#3a3d40';
+        item.onmouseleave = () => item.style.background = '#2a2d30';
+        item.innerHTML = `
+            <div style="
+                width: 60px;
+                height: 40px;
+                background: #111;
+                border-radius: 3px;
+                overflow: hidden;
+                flex-shrink: 0;
+            "><img src="${source.thumbnail}" style="width: 100%; height: 100%; object-fit: cover;"></div>
+            <div style="color: #fff; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${source.name}</div>
+        `;
+        item.onclick = () => selectAudioSource(source);
+        list.appendChild(item);
+    });
+    
+    document.getElementById('audio-cancel').onclick = () => {
+        selector.remove();
+    };
+}
+
+async function selectAudioSource(source) {
+    const selector = document.getElementById('audio-selector');
+    if (selector) selector.remove();
+    
+    const statusEl = document.getElementById('audio-status');
+    statusEl.textContent = 'Audio: Connecting...';
+    statusEl.className = '';
+    
+    try {
+        let audioTrack = null;
+        
+        if (window.electronAPI) {
+            const constraints = {
+                audio: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: source.id
+                    }
+                },
+                video: {
+                    mandatory: {
+                        chromeMediaSource: 'desktop',
+                        chromeMediaSourceId: source.id,
+                        maxWidth: 1,
+                        maxHeight: 1
+                    }
+                }
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            audioTrack = stream.getAudioTracks()[0];
+            stream.getVideoTracks().forEach(t => t.stop());
+        } else {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            audioTrack = stream.getAudioTracks()[0];
+            stream.getVideoTracks().forEach(t => t.stop());
+        }
+        
+        if (!audioTrack) {
+            statusEl.textContent = 'Audio: No audio track';
+            statusEl.className = 'error';
+            return false;
+        }
+        
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.75;
+        const audioSource = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+        audioSource.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        selectedAudioSource = source;
+        statusEl.textContent = 'Audio: ' + source.name.substring(0, 20);
+        statusEl.className = 'active';
+        statusEl.title = source.name;
+        
+        return true;
+    } catch (err) {
+        console.error('Audio connection error:', err);
+        statusEl.textContent = 'Audio: ' + err.message;
+        statusEl.className = 'error';
         return false;
     }
 }
@@ -604,6 +767,16 @@ function updateAudioData() {
     audioMid.value = Math.min(midNorm * settings.midSensitivity.value, 1);
     audioHigh.value = Math.min(highNorm * settings.highSensitivity.value, 1);
     audioOverall.value = (audioBass.value + audioMid.value + audioHigh.value) / 3;
+    
+    // Sync audio to Spout
+    if (window.spoutAPI && settings.spoutEnabled.value) {
+        window.spoutAPI.syncAudio({
+            bass: audioBass.value,
+            mid: audioMid.value,
+            high: audioHigh.value,
+            overall: audioOverall.value
+        });
+    }
 }
 
 // GUI
@@ -648,7 +821,10 @@ function createGUI() {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = s.value;
-            checkbox.onchange = () => { s.value = checkbox.checked; };
+            checkbox.onchange = () => { 
+                s.value = checkbox.checked;
+                syncToSpout();
+            };
             row.appendChild(label);
             row.appendChild(checkbox);
         } else {
@@ -666,6 +842,7 @@ function createGUI() {
             input.oninput = () => {
                 s.value = parseFloat(input.value);
                 valueDisplay.textContent = s.value.toFixed(2);
+                syncToSpout();
             };
             
             row.appendChild(label);
@@ -736,8 +913,109 @@ function createGUI() {
     addSlider(ctrlFolder.content, 'autoRotateSpeed');
     container.appendChild(ctrlFolder.folder);
     
+    // Spout folder (only in Electron)
+    const isElectron = window.isElectron === true;
+    if (isElectron && window.spoutAPI) {
+        const spoutFolder = createFolder('Spout Output');
+        
+        const enableRow = document.createElement('div');
+        enableRow.className = 'control-row';
+        const enableLabel = document.createElement('label');
+        enableLabel.textContent = 'Enable Spout';
+        const enableCheckbox = document.createElement('input');
+        enableCheckbox.type = 'checkbox';
+        enableCheckbox.checked = settings.spoutEnabled.value;
+        enableCheckbox.onchange = async () => {
+            if (enableCheckbox.checked) {
+                const result = await window.spoutAPI.enable();
+                if (result.success) {
+                    settings.spoutEnabled.value = true;
+                    syncToSpout();
+                } else {
+                    enableCheckbox.checked = false;
+                    console.error('Spout enable failed:', result.error);
+                }
+            } else {
+                await window.spoutAPI.disable();
+                settings.spoutEnabled.value = false;
+            }
+        };
+        enableRow.appendChild(enableLabel);
+        enableRow.appendChild(enableCheckbox);
+        spoutFolder.content.appendChild(enableRow);
+        
+        const nameRow = document.createElement('div');
+        nameRow.className = 'control-row';
+        const nameLabel = document.createElement('label');
+        nameLabel.textContent = 'Sender Name';
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.value = settings.spoutSenderName.value;
+        nameInput.style.flex = '1';
+        nameInput.style.marginLeft = '8px';
+        nameInput.style.background = '#222';
+        nameInput.style.border = '1px solid #444';
+        nameInput.style.color = '#fff';
+        nameInput.style.padding = '4px 8px';
+        nameInput.style.borderRadius = '3px';
+        nameInput.onchange = async () => {
+            settings.spoutSenderName.value = nameInput.value;
+            if (settings.spoutEnabled.value) {
+                await window.spoutAPI.updateName(nameInput.value);
+            }
+        };
+        nameRow.appendChild(nameLabel);
+        nameRow.appendChild(nameInput);
+        spoutFolder.content.appendChild(nameRow);
+        
+        container.appendChild(spoutFolder.folder);
+        
+        window.spoutAPI.onStatusChange((enabled) => {
+            settings.spoutEnabled.value = enabled;
+            enableCheckbox.checked = enabled;
+        });
+        
+        window.spoutAPI.onSceneRequest(() => {
+            if (currentScene) {
+                window.spoutAPI.syncScene(currentScene);
+            }
+        });
+    }
+    
     container.classList.add('visible');
     toggleBtn.textContent = 'Hide';
+}
+
+function syncToSpout() {
+    if (!window.spoutAPI || !settings.spoutEnabled.value) return;
+    
+    const settingsData = {
+        bassSensitivity: settings.bassSensitivity.value,
+        midSensitivity: settings.midSensitivity.value,
+        highSensitivity: settings.highSensitivity.value,
+        bassSpawnRate: settings.bassSpawnRate.value,
+        bassRadius: settings.bassRadius.value,
+        bassBloom: settings.bassBloom.value,
+        midTurbulence: settings.midTurbulence.value,
+        midFrequency: settings.midFrequency.value,
+        midSpeed: settings.midSpeed.value,
+        highSize: settings.highSize.value,
+        highColorSpeed: settings.highColorSpeed.value,
+        overallLifetime: settings.overallLifetime.value,
+        baseSpawnRate: settings.baseSpawnRate.value,
+        baseTurbulence: settings.baseTurbulence.value,
+        baseSize: settings.baseSize.value,
+        baseRadius: settings.baseRadius.value,
+        bloomStrength: settings.bloomStrength.value,
+        bloomThreshold: settings.bloomThreshold.value,
+        bloomRadius: settings.bloomRadius.value,
+        pulseSpeed: settings.pulseSpeed.value,
+        minWidth: settings.minWidth.value,
+        maxWidth: settings.maxWidth.value,
+        autoRotate: settings.autoRotate.value,
+        autoRotateSpeed: settings.autoRotateSpeed.value
+    };
+    window.spoutAPI.syncSettings(settingsData);
 }
 
 async function init(sceneType) {
@@ -792,6 +1070,11 @@ async function init(sceneType) {
 
     currentScene = sceneType;
     
+    // Sync scene to Spout
+    if (window.spoutAPI && settings.spoutEnabled.value) {
+        window.spoutAPI.syncScene(sceneType);
+    }
+    
     createGUI();
     
     // Update scene indicator
@@ -842,6 +1125,11 @@ document.querySelectorAll('.scene-btn').forEach(btn => {
         document.getElementById('start-overlay').style.display = 'none';
         await initAudio();
         await init(sceneType);
+        
+        // Sync scene to Spout when switching scenes
+        if (window.spoutAPI && settings.spoutEnabled.value) {
+            window.spoutAPI.syncScene(sceneType);
+        }
     });
 });
 

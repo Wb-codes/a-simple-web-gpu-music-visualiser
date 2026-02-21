@@ -1,19 +1,26 @@
 {
   "name": "music_vis",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "electron/main.js",
   "scripts": {
     "start": "serve -p 3002",
-    "dev": "serve -p 3002"
+    "dev": "serve -p 3002",
+    "electron": "electron .",
+    "rebuild-spout": "cd node_modules/electron-spout && cmake-js compile",
+    "electron-rebuild": "electron-rebuild -f -w electron-spout"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "cmake-js": "^8.0.0",
+    "electron": "^28.0.0",
+    "electron-rebuild": "^3.2.9",
     "serve": "^14.2.5"
   },
   "dependencies": {
+    "electron-spout": "github:cnSchwarzer/electron-spout",
     "three": "^0.179.0"
   }
 }
