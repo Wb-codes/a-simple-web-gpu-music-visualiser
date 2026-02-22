@@ -61,13 +61,14 @@ export async function initScene(sceneType, renderer, camera, controls) {
  * @param {number} delta - Time since last frame in seconds
  * @param {Object} settings - Current settings values
  * @param {THREE.WebGPURenderer} renderer - The WebGPU renderer
+ * @param {Object} audioData - Audio analysis data with bass, mid, high, overall
  */
-export function updateScene(delta, settings, renderer) {
+export function updateScene(delta, settings, renderer, audioData) {
     if (!currentSceneType) return;
     
     const sceneConfig = sceneRegistry[currentSceneType];
     if (sceneConfig) {
-        sceneConfig.update(delta, settings, renderer);
+        sceneConfig.update(delta, settings, renderer, audioData);
     }
 }
 

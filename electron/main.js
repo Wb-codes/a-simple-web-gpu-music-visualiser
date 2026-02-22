@@ -23,7 +23,6 @@ let spoutEnabled = false;
 let spoutSenderName = 'Music Visualizer';
 let hasShownSpoutDialog = false;
 let paintCount = 0;
-let textureCount = 0;
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -66,13 +65,13 @@ async function createSpoutWindow() {
     }
   });
 
-  await spoutWindow.loadFile('spout-output.html');
-  console.log('Spout window loaded');
-  
   spoutWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
     console.log('[Spout Window]', message);
   });
-  
+
+  await spoutWindow.loadFile('spout-output.html');
+  console.log('Spout window loaded');
+
   spoutWindow.webContents.setFrameRate(60);
   spoutWindow.webContents.startPainting();
   console.log('Spout window painting started');

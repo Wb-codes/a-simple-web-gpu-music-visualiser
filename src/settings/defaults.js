@@ -90,6 +90,44 @@ export const defaultSettings = {
     /** Maximum line width */
     maxWidth: { value: 20, min: 2, max: 30, label: "Max Width" },
     
+    // === Audio-reactive Instanced Points ===
+    /** Max Width base value */
+    pointsMaxWidth: { value: 20, min: 2, max: 30, label: "Overall" },
+    /** Max Width bass sensitivity */
+    pointsMaxWidthBass: { value: 0.5, min: 0, max: 2, label: "Bass Sens" },
+    /** Max Width mid sensitivity */
+    pointsMaxWidthMid: { value: 0.3, min: 0, max: 2, label: "Mid Sens" },
+    /** Max Width high sensitivity */
+    pointsMaxWidthHigh: { value: 0.2, min: 0, max: 2, label: "High Sens" },
+    
+    /** Min Width base value */
+    pointsMinWidth: { value: 6, min: 1, max: 30, label: "Overall" },
+    /** Min Width bass sensitivity */
+    pointsMinWidthBass: { value: 0.5, min: 0, max: 2, label: "Bass Sens" },
+    /** Min Width mid sensitivity */
+    pointsMinWidthMid: { value: 0.3, min: 0, max: 2, label: "Mid Sens" },
+    /** Min Width high sensitivity */
+    pointsMinWidthHigh: { value: 0.2, min: 0, max: 2, label: "High Sens" },
+    
+    /** Pulse Speed base value */
+    pointsPulseSpeed: { value: 6, min: 1, max: 20, label: "Overall" },
+    /** Pulse Speed bass sensitivity */
+    pointsPulseSpeedBass: { value: 0.5, min: 0, max: 2, label: "Bass Sens" },
+    /** Pulse Speed mid sensitivity */
+    pointsPulseSpeedMid: { value: 0.3, min: 0, max: 2, label: "Mid Sens" },
+    /** Pulse Speed high sensitivity */
+    pointsPulseSpeedHigh: { value: 0.2, min: 0, max: 2, label: "High Sens" },
+    
+    // === Audio-reactive Bloom ===
+    /** Bloom intensity base value */
+    bloomIntensity: { value: 0.75, min: 0, max: 3, label: "Intensity" },
+    /** Bloom bass sensitivity */
+    bloomBass: { value: 0.5, min: 0, max: 2, label: "Bass Sens" },
+    /** Bloom mid sensitivity */
+    bloomMid: { value: 0.3, min: 0, max: 2, label: "Mid Sens" },
+    /** Bloom high sensitivity */
+    bloomHigh: { value: 0.2, min: 0, max: 2, label: "High Sens" },
+    
     // === Camera Controls ===
     /** Enable automatic camera rotation */
     autoRotate: { value: true, label: "Auto Rotate" },

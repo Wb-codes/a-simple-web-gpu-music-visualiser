@@ -56,12 +56,16 @@ export async function initVisualization(options) {
 
     // Initialize renderer once
     if (!appState.isInitialized) {
+        console.log('[Bootstrap] Initializing renderer...', rendererConfig);
         await initRenderer({
             width: rendererConfig.width,
             height: rendererConfig.height,
             autoRotate: settings.autoRotate.value,
             autoRotateSpeed: settings.autoRotateSpeed.value
         });
+        
+        console.log('[Bootstrap] Renderer initialized');
+        console.log('[Bootstrap] Canvas:', document.querySelector('canvas'));
         
         window.addEventListener('resize', () => onWindowResize(
             rendererConfig.width,
@@ -72,10 +76,13 @@ export async function initVisualization(options) {
     }
 
     // Reset camera
+    console.log('[Bootstrap] Resetting camera...');
     resetCamera();
 
     // Initialize scene
+    console.log('[Bootstrap] Initializing scene:', sceneType);
     const scene = await initScene(sceneType, getRenderer(), getCamera(), getControls());
+    console.log('[Bootstrap] Scene initialized:', !!scene);
 
     // Setup post-processing
     setupPostProcessing(scene, {
@@ -114,28 +121,34 @@ function animate() {
     if (appState.onAudioUpdate) {
         appState.onAudioUpdate(audioData);
     }
-
-    // Update bloom (works fine even with audioData = {bass:0, ...})
+    
+    // Calculate audio-reactive bloom
+    const bloomStrength = settings.bloomIntensity.value + 
+        (audioData.bass * settings.bloomBass.value) +
+        (audioData.mid * settings.bloomMid.value) +
+        (audioData.high * settings.bloomHigh.value);
+    
+    // Update bloom
     updateBloom({
-        strength: settings.bloomStrength.value + audioData.bass * settings.bassBloom.value,
+        strength: bloomStrength,
         threshold: settings.bloomThreshold.value,
         radius: settings.bloomRadius.value
     });
-
+    
     // Update controls
     updateControls({
         autoRotate: settings.autoRotate.value,
         autoRotateSpeed: settings.autoRotateSpeed.value
     });
-
-    // Update current scene
-    updateScene(delta, settings, renderer);
-
+    
+    // Update current scene with audio data
+    updateScene(delta, settings, renderer, audioData);
+    
     // Pre-render callback
     if (appState.onRender) {
         appState.onRender(delta, audioData);
     }
-
+    
     // Render
     render();
 }
@@ -179,3 +192,6 @@ export function stopAnimation() {
 export function startAnimation() {
     setAnimationLoop(() => animate());
 }
+
+// Re-export camera and controls getters for external use
+export { getCamera, getControls } from './renderer.js';

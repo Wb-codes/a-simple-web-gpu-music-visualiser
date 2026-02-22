@@ -289,6 +289,253 @@ export function createSpoutControls(container, settings, onEnableChange, onNameC
 }
 
 /**
+ * Create GUI specifically for Instanced Points scene.
+ * Audio-reactive parameters with sensitivity controls.
+ * 
+ * @param {Object} settings - Settings object
+ * @param {HTMLElement} container - Container element
+ * @param {Function} onChange - Callback when settings change
+ * @param {boolean} isElectron - Whether running in Electron mode
+ */
+export function createPointsGUI(settings, container, onChange, isElectron) {
+    const handleChange = () => {
+        if (onChange) onChange();
+    };
+    
+    // Get toggle button
+    const toggleBtn = document.getElementById('toggle-controls');
+    
+    // Setup toggle button
+    if (toggleBtn) {
+        toggleBtn.classList.add('visible');
+        toggleBtn.textContent = 'Hide';
+        toggleBtn.onclick = () => {
+            container.classList.toggle('visible');
+            toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
+        };
+    }
+    
+    // Clear existing content
+    container.innerHTML = '';
+    
+    // Max Width folder
+    const maxWidthFolder = createFolder('Max Width', container);
+    addSlider(maxWidthFolder.content, settings.pointsMaxWidth, handleChange);
+    addSlider(maxWidthFolder.content, settings.pointsMaxWidthBass, handleChange);
+    addSlider(maxWidthFolder.content, settings.pointsMaxWidthMid, handleChange);
+    addSlider(maxWidthFolder.content, settings.pointsMaxWidthHigh, handleChange);
+    
+    // Min Width folder
+    const minWidthFolder = createFolder('Min Width', container);
+    addSlider(minWidthFolder.content, settings.pointsMinWidth, handleChange);
+    addSlider(minWidthFolder.content, settings.pointsMinWidthBass, handleChange);
+    addSlider(minWidthFolder.content, settings.pointsMinWidthMid, handleChange);
+    addSlider(minWidthFolder.content, settings.pointsMinWidthHigh, handleChange);
+    
+    // Pulse Speed folder
+    const pulseFolder = createFolder('Pulse Speed', container);
+    addSlider(pulseFolder.content, settings.pointsPulseSpeed, handleChange);
+    addSlider(pulseFolder.content, settings.pointsPulseSpeedBass, handleChange);
+    addSlider(pulseFolder.content, settings.pointsPulseSpeedMid, handleChange);
+    addSlider(pulseFolder.content, settings.pointsPulseSpeedHigh, handleChange);
+    
+    // Bloom folder (audio-reactive)
+    const bloomFolder = createFolder('Bloom', container);
+    addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);
+    addSlider(bloomFolder.content, settings.bloomBass, handleChange);
+    addSlider(bloomFolder.content, settings.bloomMid, handleChange);
+    addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
+    
+    // Output folder
+    const outputFolder = createFolder('Output', container);
+    addSlider(outputFolder.content, settings.autoRotate, handleChange);
+    addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
+    addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
+    
+    // Spout controls (Electron only)
+    if (isElectron) {
+        createSpoutControls(outputFolder.content, settings, async (enabled) => {
+            if (enabled) {
+                const result = await window.spoutAPI.enable();
+                if (result.success) {
+                    settings.spoutEnabled.value = true;
+                    if (onChange) onChange();
+                }
+            } else {
+                await window.spoutAPI.disable();
+                settings.spoutEnabled.value = false;
+                if (onChange) onChange();
+            }
+        }, async (name) => {
+            settings.spoutSenderName.value = name;
+            if (settings.spoutEnabled.value) {
+                await window.spoutAPI.updateName(name);
+            }
+        });
+    }
+    
+    // Show container by default
+    container.classList.add('visible');
+}
+
+/**
+ * Create GUI for Linked Particles scene.
+ * 
+ * @param {Object} settings - Settings object
+ * @param {HTMLElement} container - Container element
+ * @param {Function} onChange - Callback when settings change
+ * @param {boolean} isElectron - Whether running in Electron mode
+ */
+export function createParticlesGUI(settings, container, onChange, isElectron) {
+    const handleChange = () => {
+        if (onChange) onChange();
+    };
+    
+    // Get toggle button
+    const toggleBtn = document.getElementById('toggle-controls');
+    
+    // Setup toggle button
+    if (toggleBtn) {
+        toggleBtn.classList.add('visible');
+        toggleBtn.textContent = 'Hide';
+        toggleBtn.onclick = () => {
+            container.classList.toggle('visible');
+            toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
+        };
+    }
+    
+    // Clear existing content
+    container.innerHTML = '';
+    
+    // Spawn folder
+    const spawnFolder = createFolder('Spawn', container);
+    addSlider(spawnFolder.content, settings.bassSpawnRate, handleChange);
+    addSlider(spawnFolder.content, settings.baseSpawnRate, handleChange);
+    
+    // Radius folder
+    const radiusFolder = createFolder('Radius', container);
+    addSlider(radiusFolder.content, settings.bassRadius, handleChange);
+    addSlider(radiusFolder.content, settings.baseRadius, handleChange);
+    
+    // Turbulence folder
+    const turbFolder = createFolder('Turbulence', container);
+    addSlider(turbFolder.content, settings.midTurbulence, handleChange);
+    addSlider(turbFolder.content, settings.midFrequency, handleChange);
+    addSlider(turbFolder.content, settings.baseTurbulence, handleChange);
+    
+    // Particle Size folder
+    const sizeFolder = createFolder('Particle Size', container);
+    addSlider(sizeFolder.content, settings.highSize, handleChange);
+    addSlider(sizeFolder.content, settings.baseSize, handleChange);
+    
+    // Bloom folder
+    const bloomFolder = createFolder('Bloom', container);
+    addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);
+    addSlider(bloomFolder.content, settings.bloomBass, handleChange);
+    addSlider(bloomFolder.content, settings.bloomMid, handleChange);
+    addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
+    
+    // Output folder
+    const outputFolder = createFolder('Output', container);
+    addSlider(outputFolder.content, settings.autoRotate, handleChange);
+    addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
+    addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
+    
+    // Spout controls (Electron only)
+    if (isElectron) {
+        createSpoutControls(outputFolder.content, settings, async (enabled) => {
+            if (enabled) {
+                const result = await window.spoutAPI.enable();
+                if (result.success) {
+                    settings.spoutEnabled.value = true;
+                    if (onChange) onChange();
+                }
+            } else {
+                await window.spoutAPI.disable();
+                settings.spoutEnabled.value = false;
+                if (onChange) onChange();
+            }
+        }, async (name) => {
+            settings.spoutSenderName.value = name;
+            if (settings.spoutEnabled.value) {
+                await window.spoutAPI.updateName(name);
+            }
+        });
+    }
+    
+    // Show container by default
+    container.classList.add('visible');
+}
+
+/**
+ * Create GUI for Skinning Points scene.
+ * 
+ * @param {Object} settings - Settings object
+ * @param {HTMLElement} container - Container element
+ * @param {Function} onChange - Callback when settings change
+ * @param {boolean} isElectron - Whether running in Electron mode
+ */
+export function createSkinningGUI(settings, container, onChange, isElectron) {
+    const handleChange = () => {
+        if (onChange) onChange();
+    };
+    
+    // Get toggle button
+    const toggleBtn = document.getElementById('toggle-controls');
+    
+    // Setup toggle button
+    if (toggleBtn) {
+        toggleBtn.classList.add('visible');
+        toggleBtn.textContent = 'Hide';
+        toggleBtn.onclick = () => {
+            container.classList.toggle('visible');
+            toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
+        };
+    }
+    
+    // Clear existing content
+    container.innerHTML = '';
+    
+    // Bloom folder
+    const bloomFolder = createFolder('Bloom', container);
+    addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);
+    addSlider(bloomFolder.content, settings.bloomBass, handleChange);
+    addSlider(bloomFolder.content, settings.bloomMid, handleChange);
+    addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
+    
+    // Output folder
+    const outputFolder = createFolder('Output', container);
+    addSlider(outputFolder.content, settings.autoRotate, handleChange);
+    addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
+    addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
+    
+    // Spout controls (Electron only)
+    if (isElectron) {
+        createSpoutControls(outputFolder.content, settings, async (enabled) => {
+            if (enabled) {
+                const result = await window.spoutAPI.enable();
+                if (result.success) {
+                    settings.spoutEnabled.value = true;
+                    if (onChange) onChange();
+                }
+            } else {
+                await window.spoutAPI.disable();
+                settings.spoutEnabled.value = false;
+                if (onChange) onChange();
+            }
+        }, async (name) => {
+            settings.spoutSenderName.value = name;
+            if (settings.spoutEnabled.value) {
+                await window.spoutAPI.updateName(name);
+            }
+        });
+    }
+    
+    // Show container by default
+    container.classList.add('visible');
+}
+
+/**
  * Get all setting values as a plain object.
  * @param {Object} settings - Settings object
  * @returns {Object} Plain object with setting values

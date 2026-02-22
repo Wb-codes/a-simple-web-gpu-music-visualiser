@@ -139,22 +139,42 @@ export async function initPointsScene(renderer, camera, controls) {
  * @param {number} delta - Time since last frame in seconds
  * @param {Object} settings - Current settings values
  * @param {THREE.WebGPURenderer} renderer - The WebGPU renderer
+ * @param {Object} audioData - Audio analysis data with bass, mid, high, overall
  */
-export function updatePointsScene(delta, settings, renderer) {
-    pointsScene.pulseSpeed.value = settings.pulseSpeed.value;
-    pointsScene.minWidth.value = settings.minWidth.value;
-    pointsScene.maxWidth.value = settings.maxWidth.value;
+export function updatePointsScene(delta, settings, renderer, audioData) {
+    const { bass, mid, high } = audioData || { bass: 0, mid: 0, high: 0 };
+    
+    // Audio-reactive Max Width
+    const maxWidth = settings.pointsMaxWidth.value + 
+        (bass * settings.pointsMaxWidthBass.value) +
+        (mid * settings.pointsMaxWidthMid.value) +
+        (high * settings.pointsMaxWidthHigh.value);
+    pointsScene.maxWidth.value = Math.min(maxWidth, 30); // Clamp to max
+    
+    // Audio-reactive Min Width
+    const minWidth = settings.pointsMinWidth.value +
+        (bass * settings.pointsMinWidthBass.value) +
+        (mid * settings.pointsMinWidthMid.value) +
+        (high * settings.pointsMinWidthHigh.value);
+    pointsScene.minWidth.value = Math.min(minWidth, 30); // Clamp to max
+    
+    // Audio-reactive Pulse Speed
+    const pulseSpeed = settings.pointsPulseSpeed.value +
+        (bass * settings.pointsPulseSpeedBass.value) +
+        (mid * settings.pointsPulseSpeedMid.value) +
+        (high * settings.pointsPulseSpeedHigh.value);
+    pointsScene.pulseSpeed.value = pulseSpeed;
     
     pointsScene.elapsedTime += delta;
     renderer.compute(pointsScene.computeSize);
-
+    
     // Green screen toggle - hide icosahedron and use flat green background
     if (pointsScene.backgroundMesh) {
         pointsScene.backgroundMesh.visible = !settings.greenScreen.value;
     }
     if (pointsScene.scene) {
-        pointsScene.scene.background = settings.greenScreen.value 
-            ? new THREE.Color(0x007900) 
+        pointsScene.scene.background = settings.greenScreen.value
+            ? new THREE.Color(0x007900)
             : null;
     }
 }

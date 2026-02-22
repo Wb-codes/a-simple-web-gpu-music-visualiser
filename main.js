@@ -6,12 +6,12 @@
 
 import { initVisualization, stopAnimation } from './src/core/bootstrap.js';
 import { initAudio, analyzeAudio, isAudioActive } from './src/audio/capture.js';
-import { createGUI, createSpoutControls } from './src/gui/index.js';
+import { createPointsGUI, createParticlesGUI, createSkinningGUI } from './src/gui/index.js';
 import { createSettings } from './src/settings/defaults.js';
 import { getSceneName } from './src/scenes/registry.js';
 import { 
     syncSettingsToSpout, 
-    syncAudioToSpout, 
+    syncAudioToSpout,
     syncSceneToSpout,
     isSpoutAvailable
 } from './src/spout/sync.js';
@@ -19,12 +19,15 @@ import {
 // === State ===
 const settings = createSettings();
 let app = null;
+let currentSceneType = 'particles';
 
 /**
  * Initialize the application with scene and Spout support.
  * @param {string} sceneType - Scene type to initialize
  */
 async function init(sceneType) {
+    currentSceneType = sceneType;
+    
     // Initialize visualization
     app = await initVisualization({
         settings,
@@ -40,37 +43,18 @@ async function init(sceneType) {
     // Sync scene to Spout
     syncSceneToSpout(sceneType);
 
-    // Create GUI
-    createGUI(settings, null, () => syncSettingsToSpout(settings));
-
-    // Add Spout controls if in Electron
-    if (isSpoutAvailable() && window.isElectron) {
-        const container = document.getElementById('controls');
-        createSpoutControls(container, settings, async (enabled) => {
-            if (enabled) {
-                const result = await window.spoutAPI.enable();
-                if (result.success) {
-                    settings.spoutEnabled.value = true;
-                    syncSettingsToSpout(settings);
-                }
-            } else {
-                await window.spoutAPI.disable();
-                settings.spoutEnabled.value = false;
-            }
-        }, async (name) => {
-            if (settings.spoutEnabled.value) {
-                await window.spoutAPI.updateName(name);
-            }
-        });
-
-        // Listen for scene requests from spout window
-        window.spoutAPI.onSceneRequest(() => {
-            // Already handled by sync.js setupSpoutSyncListeners
-        });
-
-        window.spoutAPI.onStatusChange((enabled) => {
-            settings.spoutEnabled.value = enabled;
-        });
+    // Create scene-specific GUI
+    const container = document.getElementById('controls');
+    const isElectron = window.isElectron === true;
+    
+    if (sceneType === 'points') {
+        createPointsGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
+    } else if (sceneType === 'particles') {
+        createParticlesGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
+    } else if (sceneType === 'skinning') {
+        createSkinningGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
+    } else {
+        console.warn('Unknown scene type:', sceneType);
     }
 
     // Update scene indicator

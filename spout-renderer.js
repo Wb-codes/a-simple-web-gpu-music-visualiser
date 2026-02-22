@@ -5,7 +5,8 @@
  */
 
 import { initVisualization } from './src/core/bootstrap.js';
-import { createSettings, deserializeSettings } from './src/settings/defaults.js';
+import { createSettings } from './src/settings/defaults.js';
+import { deserializeSettings } from './src/settings/utils.js';
 import { setupSpoutSyncListeners, isSpoutSyncAvailable } from './src/spout/sync.js';
 
 const settings = createSettings();
@@ -14,6 +15,8 @@ const settings = createSettings();
  * Initialize the spout renderer.
  */
 async function init() {
+    console.log('[Spout] Initializing...');
+    
     // Setup spout sync listeners first
     if (isSpoutSyncAvailable()) {
         setupSpoutSyncListeners({
@@ -22,6 +25,7 @@ async function init() {
                 deserializeSettings(settings, newSettings);
             },
             onSceneChange: async (sceneType) => {
+                console.log('[Spout] Scene change to:', sceneType);
                 // Reinitialize with new scene
                 await initVisualization({
                     settings,
@@ -35,7 +39,7 @@ async function init() {
         });
     }
 
-    // Initialize with default scene
+    // Initialize with default scene immediately
     await initVisualization({
         settings,
         sceneType: 'particles',
@@ -45,10 +49,10 @@ async function init() {
         }
     });
 
-    console.log('Spout renderer initialized');
+    console.log('[Spout] Renderer initialized');
 }
 
 // Initialize on load
 init().catch(err => {
-    console.error('Spout renderer init error:', err);
+    console.error('[Spout] Init error:', err);
 });

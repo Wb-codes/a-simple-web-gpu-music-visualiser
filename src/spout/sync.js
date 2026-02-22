@@ -178,7 +178,7 @@ export function setupSpoutSyncListeners(options) {
         });
         
         window.spoutSync.onScene((sceneType) => {
-            console.log('Spout scene change received:', sceneType, 'type:', typeof sceneType, 'handler:', handleSceneChange);
+            console.log('Spout scene change received:', sceneType);
             if (!sceneType) {
                 console.error('ERROR: sceneType is undefined or null');
                 return;
