@@ -140,24 +140,3 @@ export function createAnimationLoop(options = {}) {
         if (render) render();
     };
 }
-
-/**
- * Simple animation loop for spout renderer.
- * Minimal setup without audio/GUI.
- * @param {Object} sceneUpdaters - Scene update functions
- * @param {Function} sceneUpdaters.particles - Update particles scene
- * @param {Function} sceneUpdaters.points - Update points scene
- * @param {Function} sceneUpdaters.skinning - Update skinning scene
- * @returns {Function} Animation loop function
- */
-export function createSimpleAnimationLoop(sceneUpdaters) {
-    return function simpleAnimationLoop() {
-        const delta = clock.getDelta();
-        frameCount++;
-
-        // Update controls
-        // Handled by render() in renderer.js
-        
-        // Render handled externally
-    };
-}

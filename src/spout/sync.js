@@ -5,6 +5,7 @@
  */
 
 import { audioBass, audioMid, audioHigh, audioOverall } from '../audio/uniforms.js';
+import { serializeSettings } from '../settings/utils.js';
 
 /**
  * Check if Spout API is available.
@@ -30,34 +31,7 @@ export function isSpoutEnabled(settings) {
 export function syncSettingsToSpout(settings) {
     if (!isSpoutAvailable() || !settings.spoutEnabled?.value) return;
     
-    const settingsData = {
-        bassSensitivity: settings.bassSensitivity?.value,
-        midSensitivity: settings.midSensitivity?.value,
-        highSensitivity: settings.highSensitivity?.value,
-        bassSpawnRate: settings.bassSpawnRate?.value,
-        bassRadius: settings.bassRadius?.value,
-        bassBloom: settings.bassBloom?.value,
-        midTurbulence: settings.midTurbulence?.value,
-        midFrequency: settings.midFrequency?.value,
-        midSpeed: settings.midSpeed?.value,
-        highSize: settings.highSize?.value,
-        highColorSpeed: settings.highColorSpeed?.value,
-        overallLifetime: settings.overallLifetime?.value,
-        baseSpawnRate: settings.baseSpawnRate?.value,
-        baseTurbulence: settings.baseTurbulence?.value,
-        baseSize: settings.baseSize?.value,
-        baseRadius: settings.baseRadius?.value,
-        bloomStrength: settings.bloomStrength?.value,
-        bloomThreshold: settings.bloomThreshold?.value,
-        bloomRadius: settings.bloomRadius?.value,
-        pulseSpeed: settings.pulseSpeed?.value,
-        minWidth: settings.minWidth?.value,
-        maxWidth: settings.maxWidth?.value,
-        autoRotate: settings.autoRotate?.value,
-        autoRotateSpeed: settings.autoRotateSpeed?.value,
-        greenScreen: settings.greenScreen?.value
-    };
-    
+    const settingsData = serializeSettings(settings);
     window.spoutAPI.syncSettings(settingsData);
 }
 

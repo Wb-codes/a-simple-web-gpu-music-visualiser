@@ -154,7 +154,7 @@ export function updatePointsScene(delta, settings, renderer) {
     }
     if (pointsScene.scene) {
         pointsScene.scene.background = settings.greenScreen.value 
-            ? new THREE.Color(0x00FF00) 
+            ? new THREE.Color(0x007900) 
             : null;
     }
 }

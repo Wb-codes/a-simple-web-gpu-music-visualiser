@@ -1,82 +1,50 @@
 /**
  * @module main
  * @description Main window entry point for the music visualizer.
- * Initializes WebGPU renderer, audio capture, scene management, and GUI.
+ * Uses shared bootstrap initialization with Electron-specific features.
  */
 
-import WebGPU from 'three/addons/capabilities/WebGPU.js';
-
-import { 
-    initRenderer, 
-    setupPostProcessing, 
-    updateBloom, 
-    updateControls, 
-    resetCamera, 
-    onWindowResize, 
-    getRenderer, 
-    getCamera, 
-    getControls, 
-    setAnimationLoop, 
-    render 
-} from './src/core/renderer.js';
-
-import { getDelta } from './src/core/animation.js';
-import { initScene, updateScene, getCurrentSceneType, getSceneName } from './src/scenes/registry.js';
+import { initVisualization, stopAnimation } from './src/core/bootstrap.js';
 import { initAudio, analyzeAudio, isAudioActive } from './src/audio/capture.js';
 import { createGUI, createSpoutControls } from './src/gui/index.js';
 import { createSettings } from './src/settings/defaults.js';
+import { getSceneName } from './src/scenes/registry.js';
 import { 
     syncSettingsToSpout, 
     syncAudioToSpout, 
-    syncSceneToSpout 
+    syncSceneToSpout,
+    isSpoutAvailable
 } from './src/spout/sync.js';
 
 // === State ===
 const settings = createSettings();
-let isInitialized = false;
+let app = null;
 
 /**
- * Main initialization function.
+ * Initialize the application with scene and Spout support.
  * @param {string} sceneType - Scene type to initialize
  */
 async function init(sceneType) {
-    if (!WebGPU.isAvailable()) {
-        document.body.appendChild(WebGPU.getErrorMessage());
-        throw new Error('No WebGPU support');
-    }
-
-    // Initialize renderer once
-    if (!isInitialized) {
-        await initRenderer({
-            autoRotate: settings.autoRotate.value,
-            autoRotateSpeed: settings.autoRotateSpeed.value
-        });
-        
-        window.addEventListener('resize', () => onWindowResize());
-        isInitialized = true;
-    }
-
-    // Reset camera
-    resetCamera();
-
-    // Initialize scene
-    const scene = await initScene(sceneType, getRenderer(), getCamera(), getControls());
-
-    // Setup post-processing
-    setupPostProcessing(scene, {
-        strength: settings.bloomStrength.value,
-        threshold: settings.bloomThreshold.value,
-        radius: settings.bloomRadius.value
+    // Initialize visualization
+    app = await initVisualization({
+        settings,
+        sceneType,
+        onSettingsChange: () => syncSettingsToSpout(settings),
+        onAudioUpdate: (audioData) => {
+            if (isAudioActive()) {
+                syncAudioToSpout(audioData);
+            }
+        }
     });
 
     // Sync scene to Spout
     syncSceneToSpout(sceneType);
-    
+
     // Create GUI
     createGUI(settings, null, () => syncSettingsToSpout(settings));
-    
+
     // Add Spout controls if in Electron
-    if (window.isElectron && window.spoutAPI) {
+    if (isSpoutAvailable() && window.isElectron) {
         const container = document.getElementById('controls');
         createSpoutControls(container, settings, async (enabled) => {
             if (enabled) {
@@ -94,64 +62,23 @@ async function init(sceneType) {
                 await window.spoutAPI.updateName(name);
             }
         });
-        
+
         // Listen for scene requests from spout window
         window.spoutAPI.onSceneRequest(() => {
-            const current = getCurrentSceneType();
-            if (current) {
-                window.spoutAPI.syncScene(current);
-            }
+            // Already handled by sync.js setupSpoutSyncListeners
         });
-        
+
         window.spoutAPI.onStatusChange((enabled) => {
             settings.spoutEnabled.value = enabled;
         });
     }
-    
+
     // Update scene indicator
     const indicator = document.getElementById('scene-indicator');
     if (indicator) {
         indicator.classList.add('visible');
         document.getElementById('scene-name').textContent = getSceneName(sceneType);
     }
-    
-    // Start animation loop
-    setAnimationLoop(animate);
-}
-
-/**
- * Main animation loop.
- */
-function animate() {
-    const delta = getDelta();
-    const renderer = getRenderer();
-
-    // Analyze audio
-    const audioData = analyzeAudio(settings);
-    
-    // Sync audio to Spout
-    if (isAudioActive()) {
-        syncAudioToSpout(audioData);
-    }
-
-    // Update bloom
-    updateBloom({
-        strength: settings.bloomStrength.value + audioData.bass * settings.bassBloom.value,
-        threshold: settings.bloomThreshold.value,
-        radius: settings.bloomRadius.value
-    });
-
-    // Update controls
-    updateControls({
-        autoRotate: settings.autoRotate.value,
-        autoRotateSpeed: settings.autoRotateSpeed.value
-    });
-
-    // Update current scene
-    updateScene(delta, settings, renderer);
-
-    // Render
-    render();
 }
 
 // === Event Listeners ===
@@ -161,7 +88,11 @@ document.querySelectorAll('.scene-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
         const sceneType = e.target.dataset.scene;
         document.getElementById('start-overlay').style.display = 'none';
+        
+        // Initialize audio first
         await initAudio();
+        
+        // Initialize visualization
         await init(sceneType);
         
         // Sync scene to Spout
@@ -172,7 +103,13 @@ document.querySelectorAll('.scene-btn').forEach(btn => {
 // Scene change on indicator click
 document.getElementById('scene-indicator')?.addEventListener('click', () => {
     // Stop animation
-    setAnimationLoop(null);
+    stopAnimation();
+    
+    // Cleanup app if exists
+    if (app) {
+        app.cleanup();
+        app = null;
+    }
     
     // Show overlay again
     document.getElementById('start-overlay').style.display = 'flex';
@@ -181,12 +118,4 @@ document.getElementById('scene-indicator')?.addEventListener('click', () => {
     // Clear controls
     document.getElementById('controls').innerHTML = '';
     document.getElementById('toggle-controls').classList.remove('visible');
-});
-
-// Handle scene request from Spout window
-window.spoutAPI?.onSceneRequest(() => {
-    const current = getCurrentSceneType();
-    if (current) {
-        window.spoutAPI.syncScene(current);
-    }
 });

@@ -5,6 +5,7 @@
  */
 
 import { audioBass, audioMid, audioHigh, audioOverall, updateAudioUniforms } from './uniforms.js';
+import { showAudioSourceSelector as showAudioSelector, setAudioConnecting, setAudioActive, setAudioError, setAudioSelectScreen } from '../gui/audio-selector.js';
 
 /** @type {AudioContext|null} */
 let audioContext = null;
@@ -52,12 +53,10 @@ export function getSelectedAudioSource() {
  */
 export async function initAudio() {
     try {
-        const statusEl = document.getElementById('audio-status');
-        
         if (window.isElectron && window.electronAPI) {
-            return initElectronAudio(statusEl);
+            return initElectronAudio();
         } else {
-            return initBrowserAudio(statusEl);
+            return initBrowserAudio();
         }
     } catch (err) {
         console.error('Audio error:', err);
@@ -71,13 +70,12 @@ export async function initAudio() {
  * @param {HTMLElement} statusEl - Status display element
  * @returns {Promise<boolean>}
  */
-async function initElectronAudio(statusEl) {
+async function initElectronAudio() {
     const sources = await window.electronAPI.getAudioSources();
     audioSources = sources.filter(s => s.name && !s.name.includes('Music Visualizer'));
     
     if (audioSources.length === 0) {
-        statusEl.textContent = 'Audio: No sources found';
-        statusEl.className = 'error';
+        setAudioError('No sources found');
         return false;
     }
     
@@ -90,30 +88,27 @@ async function initElectronAudio(statusEl) {
  * @param {HTMLElement} statusEl - Status display element
  * @returns {Promise<boolean>}
  */
-async function initBrowserAudio(statusEl) {
-    statusEl.textContent = 'Audio: Select screen to share';
-    statusEl.className = '';
+async function initBrowserAudio() {
+    setAudioSelectScreen();
     
-    const stream = await navigator.mediaDevices.getDisplayMedia({ 
-        video: true, 
-        audio: true 
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true
     });
     
     const audioTrack = stream.getAudioTracks()[0];
     stream.getVideoTracks().forEach(t => t.stop());
     
     if (!audioTrack) {
-        statusEl.textContent = 'Audio: No audio - check "Share audio" when sharing';
-        statusEl.className = 'error';
+        setAudioError('No audio - check "Share audio" when sharing');
         stream.getTracks().forEach(t => t.stop());
         return false;
     }
-
+    
     const success = setupAudioContext(audioTrack);
     
     if (success) {
-        statusEl.textContent = 'Audio: Active';
-        statusEl.className = 'active';
+        setAudioActive('Active');
     }
     
     return success;
@@ -146,78 +141,9 @@ function setupAudioContext(audioTrack) {
  * Show audio source selector UI (Electron mode).
  */
 function showAudioSourceSelector() {
-    let selector = document.getElementById('audio-selector');
-    if (!selector) {
-        selector = document.createElement('div');
-        selector.id = 'audio-selector';
-        selector.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(20, 23, 26, 0.98);
-            padding: 20px;
-            border-radius: 10px;
-            z-index: 2000;
-            max-width: 400px;
-            max-height: 60vh;
-            overflow-y: auto;
-            border: 1px solid #444;
-        `;
-        document.body.appendChild(selector);
-    }
-    
-    selector.innerHTML = `
-        <h3 style="color: #fff; margin-bottom: 15px; font-size: 16px;">Select Audio Source</h3>
-        <div style="color: #888; font-size: 12px; margin-bottom: 10px;">
-            Choose a window/screen to capture audio from:
-        </div>
-        <div id="audio-source-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
-        <button id="audio-cancel" style="
-            margin-top: 15px;
-            padding: 8px 16px;
-            background: #444;
-            border: none;
-            color: #fff;
-            border-radius: 5px;
-            cursor: pointer;
-            width: 100%;
-        ">Cancel</button>
-    `;
-    
-    const list = document.getElementById('audio-source-list');
-    audioSources.forEach(source => {
-        const item = document.createElement('div');
-        item.style.cssText = `
-            padding: 10px;
-            background: #2a2d30;
-            border-radius: 5px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: background 0.2s;
-        `;
-        item.onmouseenter = () => item.style.background = '#3a3d40';
-        item.onmouseleave = () => item.style.background = '#2a2d30';
-        item.innerHTML = `
-            <div style="
-                width: 60px;
-                height: 40px;
-                background: #111;
-                border-radius: 3px;
-                overflow: hidden;
-                flex-shrink: 0;
-            "><img src="${source.thumbnail}" style="width: 100%; height: 100%; object-fit: cover;"></div>
-            <div style="color: #fff; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${source.name}</div>
-        `;
-        item.onclick = () => selectAudioSource(source);
-        list.appendChild(item);
+    showAudioSelector(audioSources, (source) => {
+        selectAudioSource(source);
     });
-    
-    document.getElementById('audio-cancel').onclick = () => {
-        selector.remove();
-    };
 }
 
 /**
@@ -229,9 +155,7 @@ export async function selectAudioSource(source) {
     const selector = document.getElementById('audio-selector');
     if (selector) selector.remove();
     
-    const statusEl = document.getElementById('audio-status');
-    statusEl.textContent = 'Audio: Connecting...';
-    statusEl.className = '';
+    setAudioConnecting();
     
     try {
         let audioTrack = null;
@@ -264,17 +188,14 @@ export async function selectAudioSource(source) {
         }
         
         if (!audioTrack) {
-            statusEl.textContent = 'Audio: No audio track';
-            statusEl.className = 'error';
+            setAudioError('No audio track');
             return false;
         }
         
         setupAudioContext(audioTrack);
         
         selectedAudioSource = source;
-        statusEl.textContent = 'Audio: ' + source.name.substring(0, 20);
-        statusEl.className = 'active';
-        statusEl.title = source.name;
+        setAudioActive(source.name);
         
         return true;
     } catch (err) {
@@ -334,14 +255,10 @@ export function analyzeAudio(settings) {
  */
 function handleAudioError(err) {
     console.error('Audio error:', err);
-    const statusEl = document.getElementById('audio-status');
-    if (statusEl) {
-        if (err.name === 'NotAllowedError') {
-            statusEl.textContent = 'Audio: Cancelled - click a scene to retry';
-        } else {
-            statusEl.textContent = 'Audio: ' + err.message;
-        }
-        statusEl.className = 'error';
+    if (err.name === 'NotAllowedError') {
+        setAudioError('Cancelled - click a scene to retry');
+    } else {
+        setAudioError(err.message);
     }
 }
 

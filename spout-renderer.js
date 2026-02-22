@@ -1,120 +1,51 @@
 /**
  * @module spout-renderer
- * @description Spout window renderer - receives sync from main window
+ * @description Spout window renderer - receives sync from main window.
+ * Uses shared bootstrap initialization with sync listeners.
  */
 
-import WebGPU from 'three/addons/capabilities/WebGPU.js';
-
-import * as THREE from 'three/webgpu';
-
-import { 
-    initRenderer, 
-    setupPostProcessing, 
-    updateBloom, 
-    updateControls,
-    resetCamera, 
-    onWindowResize, 
-    getRenderer, 
-    getCamera, 
-    getControls, 
-    setAnimationLoop, 
-    render 
-} from './src/core/renderer.js';
-
-import { getDelta } from './src/core/animation.js';
-import { initScene, updateScene, getCurrentSceneType, switchScene, getSceneName } from './src/scenes/registry.js';
-import { setupSpoutSyncListeners, updateAudioFromMain } from './src/spout/sync.js';
-import { createSettings } from './src/settings/defaults.js';
+import { initVisualization } from './src/core/bootstrap.js';
+import { createSettings, deserializeSettings } from './src/settings/defaults.js';
+import { setupSpoutSyncListeners, isSpoutSyncAvailable } from './src/spout/sync.js';
 
 const settings = createSettings();
-let isInitialized = false;
-let scene = null;
 
 /**
  * Initialize the spout renderer.
  */
 async function init() {
-    if (!WebGPU.isAvailable()) {
-        document.body.appendChild(WebGPU.getErrorMessage());
-        throw new Error('No WebGPU support');
-    }
-
-    // Initialize renderer once
-    if (!isInitialized) {
-        await initRenderer({
-            width: 1920,
-            height: 1080,
-            autoRotate: settings.autoRotate.value,
-            autoRotateSpeed: settings.autoRotateSpeed.value
+    // Setup spout sync listeners first
+    if (isSpoutSyncAvailable()) {
+        setupSpoutSyncListeners({
+            settings,
+            onSettingsUpdate: (newSettings) => {
+                deserializeSettings(settings, newSettings);
+            },
+            onSceneChange: async (sceneType) => {
+                // Reinitialize with new scene
+                await initVisualization({
+                    settings,
+                    sceneType,
+                    rendererConfig: {
+                        width: 1920,
+                        height: 1080
+                    }
+                });
+            }
         });
-        
-        window.addEventListener('resize', () => onWindowResize(1920, 1080));
-        isInitialized = true;
     }
 
-    // Reset camera
-    resetCamera();
-
-    // Setup spout sync listeners
-    setupSpoutSyncListeners({
+    // Initialize with default scene
+    await initVisualization({
         settings,
-        onSettingsUpdate: (newSettings) => {
-            // Settings are updated internally by setupSpoutSyncListeners
-        },
-        onAudioUpdate: (audioData) => {
-            // Audio uniforms are updated internally
-        },
-        onSceneChange: async (sceneType) => {
-            scene = await switchScene(sceneType, getRenderer(), getCamera(), getControls());
-            setupPostProcessing(scene, {
-                strength: settings.bloomStrength.value,
-                threshold: settings.bloomThreshold.value,
-                radius: settings.bloomRadius.value
-            });
+        sceneType: 'particles',
+        rendererConfig: {
+            width: 1920,
+            height: 1080
         }
     });
 
-    // Initialize default scene
-    scene = await initScene('particles', getRenderer(), getCamera(), getControls());
-
-    // Setup post-processing
-    setupPostProcessing(scene, {
-        strength: settings.bloomStrength.value,
-        threshold: settings.bloomThreshold.value,
-        radius: settings.bloomRadius.value
-    });
-
-    console.log('Spout renderer starting, WebGPU available:', WebGPU.isAvailable());
-    
-    // Start animation loop
-    setAnimationLoop(animate);
-}
-
-/**
- * Animation loop
- */
-function animate() {
-    const delta = getDelta();
-    const renderer = getRenderer();
-
-    // Update bloom
-    updateBloom({
-        strength: settings.bloomStrength.value,
-        threshold: settings.bloomThreshold.value,
-        radius: settings.bloomRadius.value
-    });
-
-    // Update controls
-    updateControls({
-        autoRotate: settings.autoRotate.value,
-        autoRotateSpeed: settings.autoRotateSpeed.value
-    });
-
-    // Update current scene
-    updateScene(delta, settings, renderer);
-
-    // Render
-    render();
+    console.log('Spout renderer initialized');
 }
 
 // Initialize on load

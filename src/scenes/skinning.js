@@ -152,7 +152,7 @@ export function updateSkinningScene(delta, settings, renderer) {
     }
 
     // Green screen toggle
-    const greenColor = new THREE.Color(0x00FF00);
+    const greenColor = new THREE.Color(0x007900);
     const darkColor = new THREE.Color(0x111111);
     skinningScene.backgroundColor.copy(settings.greenScreen.value ? greenColor : darkColor);
 }

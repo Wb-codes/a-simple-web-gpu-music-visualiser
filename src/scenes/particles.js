@@ -344,7 +344,7 @@ export function updateParticlesScene(delta, settings, renderer) {
     }
     if (particlesScene.scene) {
         particlesScene.scene.background = greenScreenEnabled 
-            ? new THREE.Color(0x00FF00) 
+            ? new THREE.Color(0x007900) 
             : null;
     }
 }
