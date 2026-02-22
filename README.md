@@ -24,6 +24,8 @@ npm start
 
 Open http://localhost:3002 in your browser.
 
+> **Note:** Browser version uses screen/tab sharing for audio. For system audio capture, use the Electron version.
+
 ### Electron Mode (Windows)
 
 ```bash
@@ -109,21 +111,87 @@ The sender name identifies your visualization in receiving applications.
 - The Spout static library requires `/MD` (MultiThreadedDLL)
 - This is handled in CMakeLists.txt automatically
 
-## Development
+## Architecture
 
-### Project Structure
+### Modular Design
+
+The codebase is organized into focused modules under `src/`:
+
+- **`src/core/`** - Rendering infrastructure shared by all entry points
+  - `bootstrap.js` - Common initialization for browser and Electron
+  - `renderer.js` - WebGPU setup, camera, post-processing
+  - `animation.js` - Timing utilities
+  - `constants.js` - Shared constants
+
+- **`src/scenes/`** - Visualization scenes with shared utilities
+  - `base.js` - Common scene components (background, lighting, camera positions)
+  - `particles.js` - Linked particles scene
+  - `points.js` - Instanced points scene
+  - `skinning.js` - Skinning points scene
+  - `registry.js` - Scene management and switching
+
+- **`src/audio/`** - Audio processing
+  - `capture.js` - Audio input handling and analysis
+  - `uniforms.js` - TSL audio-reactive uniforms
+
+- **`src/gui/`** - User interface
+  - Settings panels with collapsible folders
+  - Audio source selector (Electron mode)
+
+- **`src/spout/`** - IPC synchronization
+  - `sync.js` - Settings/audio/scene synchronization
+
+- **`src/settings/`** - Configuration
+  - `defaults.js` - Default settings values
+  - `utils.js` - Settings serialization/deserialization
+
+### Entry Points
+
+Both `main.js` (browser) and `spout-renderer.js` (Electron) use:
+- `src/core/bootstrap.js` for shared initialization
+- `src/settings/utils.js` for settings serialization
+
+## Project Structure
 
 ```
 music_vis/
-├── index.html          # Main app HTML
-├── main.js             # Main renderer (WebGPU/Three.js)
-├── spout-output.html   # Hidden Spout window HTML
-├── spout-renderer.js   # Spout window renderer
-├── preload.js          # Electron IPC bridge
+├── index.html              # Main app HTML
+├── main.js                 # Browser entry point (~100 lines)
+├── spout-output.html       # Spout window HTML
+├── spout-renderer.js       # Electron/Spout entry point (~50 lines)
+├── preload.js              # Electron IPC bridge
 ├── electron/
-│   └── main.js         # Electron main process
-├── models/             # GLTF models for skinning scene
-└── vcpkg/              # Package manager for C++ dependencies
+│   └── main.js             # Electron main process
+├── src/
+│   ├── audio/              # Audio processing
+│   │   ├── capture.js
+│   │   ├── uniforms.js
+│   │   └── index.js
+│   ├── core/               # Core rendering
+│   │   ├── bootstrap.js    # Shared initialization
+│   │   ├── renderer.js
+│   │   ├── animation.js
+│   │   ├── constants.js
+│   │   └── index.js
+│   ├── scenes/             # Visualization scenes
+│   │   ├── base.js         # Scene utilities
+│   │   ├── particles.js
+│   │   ├── points.js
+│   │   ├── skinning.js
+│   │   ├── registry.js
+│   │   └── index.js
+│   ├── gui/                # User interface
+│   │   ├── index.js
+│   │   └── audio-selector.js
+│   ├── settings/           # Configuration
+│   │   ├── defaults.js
+│   │   ├── utils.js        # Settings utilities
+│   │   └── index.js
+│   └── spout/              # Spout synchronization
+│       ├── sync.js
+│       └── index.js
+├── models/                 # GLTF models for skinning scene
+└── vcpkg/                  # Package manager for C++ dependencies
 ```
 
 ### Scripts
@@ -173,6 +241,8 @@ Each scene has unique adjustable parameters:
 | Edge 113+ | Full support |
 | Firefox | WebGPU in development |
 | Safari | WebGPU in development |
+
+> **Note:** The browser version uses screen/tab sharing for audio capture. For system audio capture on Windows, use the Electron version.
 
 Check WebGPU support: https://webgpureport.org/
 
