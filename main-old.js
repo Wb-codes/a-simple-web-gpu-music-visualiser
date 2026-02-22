@@ -182,11 +182,3 @@ document.getElementById('scene-indicator')?.addEventListener('click', () => {
     document.getElementById('controls').innerHTML = '';
     document.getElementById('toggle-controls').classList.remove('visible');
 });
-
-// Handle scene request from Spout window
-window.spoutAPI?.onSceneRequest(() => {
-    const current = getCurrentSceneType();
-    if (current) {
-        window.spoutAPI.syncScene(current);
-    }
-});
