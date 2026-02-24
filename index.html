@@ -127,8 +127,24 @@
             display: none;
         }
         #scene-indicator.visible { display: block; }
-  #scene-indicator span { cursor: pointer; text-decoration: underline; }
-</style>
+#scene-indicator span { cursor: pointer; text-decoration: underline; }
+
+    /* Fade UI styles */
+    .fade-ui {
+      transition: opacity 300ms ease-in-out;
+      opacity: 1;
+    }
+    
+    .fade-ui.fade-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .fade-ui.fade-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
 <!-- OBS Browser Source Detection & CDN Fallback -->
 <!-- CEF (Chromium Embedded Framework) used by OBS may have issues with local file:// imports -->
 <!-- We detect OBS and use CDN imports to ensure WebGPU works correctly -->

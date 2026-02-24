@@ -7,6 +7,9 @@
 import { SCENE_NAMES } from '../core/constants.js';
 import { ANIMATION_NAMES, DEFAULT_ANIMATION } from '../core/animations.js';
 import { switchAnimation } from '../scenes/skinning.js';
+import { applyFadeBehavior, removeAllFadeBehaviors, applyFadeToSettingsButton } from './fade-manager.js';
+
+export { removeAllFadeBehaviors };
 
 /**
  * Create a folder in the GUI.
@@ -204,6 +207,9 @@ export function createSceneSelector(currentScene, onSceneChange) {
   container.appendChild(label);
   container.appendChild(select);
   document.body.appendChild(container);
+
+  // Apply fade behavior
+  applyFadeBehavior(container);
 
   return container;
 }
@@ -539,6 +545,9 @@ export function createPointsGUI(settings, container, onChange, isElectron) {
 
   // Show container by default
   container.classList.add('visible');
+
+  // Apply fade behavior to settings panel
+  applyFadeBehavior(container);
 }
 
 /**
@@ -639,6 +648,9 @@ export function createParticlesGUI(settings, container, onChange, isElectron) {
 
   // Show container by default
   container.classList.add('visible');
+
+  // Apply fade behavior to settings panel
+  applyFadeBehavior(container);
 }
 
 /**
@@ -719,6 +731,9 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
   // Show container by default
   container.classList.add('visible');
 
+  // Apply fade behavior to settings panel
+  applyFadeBehavior(container);
+
   // Create animation picker (top center)
   createAnimationPicker(settings.currentAnimation.value, ANIMATION_NAMES, (animationName) => {
     settings.currentAnimation.value = animationName;
@@ -798,6 +813,9 @@ export function createAnimationPicker(currentAnimation, animationOptions, onChan
   container.appendChild(label);
   container.appendChild(select);
   document.body.appendChild(container);
+
+  // Apply fade behavior
+  applyFadeBehavior(container);
 
   return container;
 }

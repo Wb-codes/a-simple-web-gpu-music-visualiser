@@ -6,7 +6,8 @@
 
 import { initVisualization, stopAnimation } from './src/core/bootstrap.js';
 import { initAudio, analyzeAudio, isAudioActive } from './src/audio/capture.js';
-import { createPointsGUI, createParticlesGUI, createSkinningGUI, createSceneSelector, updateSceneSelector, removeAnimationPicker } from './src/gui/index.js';
+import { createPointsGUI, createParticlesGUI, createSkinningGUI, createSceneSelector, updateSceneSelector, removeAnimationPicker, removeAllFadeBehaviors } from './src/gui/index.js';
+import { applyFadeToSettingsButton, applyFadeBehavior } from './src/gui/fade-manager.js';
 import { createSettings } from './src/settings/defaults.js';
 import { 
     syncSettingsToSpout, 
@@ -47,28 +48,37 @@ async function init(sceneType) {
     // Sync scene to Spout
     syncSceneToSpout(sceneType);
 
-    // Create scene-specific GUI
-    const container = document.getElementById('controls');
-    const isElectron = window.isElectron === true;
+// Create scene-specific GUI
+  const container = document.getElementById('controls');
+  const isElectron = window.isElectron === true;
 
-    if (sceneType === 'points') {
-      createPointsGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
-    } else if (sceneType === 'particles') {
-      createParticlesGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
-    } else if (sceneType === 'skinning') {
-      createSkinningGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
-    } else {
-      console.warn('Unknown scene type:', sceneType);
-    }
+  if (sceneType === 'points') {
+    createPointsGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
+  } else if (sceneType === 'particles') {
+    createParticlesGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
+  } else if (sceneType === 'skinning') {
+    createSkinningGUI(settings, container, () => syncSettingsToSpout(settings), isElectron);
+  } else {
+    console.warn('Unknown scene type:', sceneType);
+  }
 
-    // Hide scene indicator (using dropdown instead)
-    const indicator = document.getElementById('scene-indicator');
-    if (indicator) {
-      indicator.style.display = 'none';
-    }
+  // Hide scene indicator (using dropdown instead)
+  const indicator = document.getElementById('scene-indicator');
+  if (indicator) {
+    indicator.style.display = 'none';
+  }
 
-    // Create scene selector dropdown
-    createSceneSelector(sceneType, switchSceneWithGUI);
+  // Create scene selector dropdown
+  createSceneSelector(sceneType, switchSceneWithGUI);
+
+  // Apply fade behavior to settings button
+  applyFadeToSettingsButton();
+
+  // Apply fade behavior to scene selector
+  const sceneSelector = document.getElementById('scene-selector');
+  if (sceneSelector) {
+    applyFadeBehavior(sceneSelector);
+  }
     
     console.log('[Main] Scene initialization complete');
   } catch (err) {
@@ -118,6 +128,9 @@ export async function switchSceneWithGUI(sceneType) {
     app.cleanup();
   }
 
+  // Remove all fade behaviors from previous scene
+  removeAllFadeBehaviors();
+
   // Clear controls
   document.getElementById('controls').innerHTML = '';
 
@@ -150,6 +163,15 @@ export async function switchSceneWithGUI(sceneType) {
 
   // Update scene selector dropdown
   updateSceneSelector(sceneType);
+
+  // Apply fade behavior to settings button
+  applyFadeToSettingsButton();
+
+  // Apply fade behavior to scene selector
+  const newSceneSelector = document.getElementById('scene-selector');
+  if (newSceneSelector) {
+    applyFadeBehavior(newSceneSelector);
+  }
 }
 
 // === Event Listeners ===
