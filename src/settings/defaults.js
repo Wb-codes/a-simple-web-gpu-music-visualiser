@@ -93,37 +93,49 @@ export const defaultSettings = {
     /** Maximum line width */
     maxWidth: { value: 20, min: 2, max: 30, label: "Max Width" },
     
-    // === Audio-reactive Instanced Points ===
-    /** Max Width base value */
-    pointsMaxWidth: { value: 20, min: 2, max: 30, label: "Overall" },
-    /** Max Width bass sensitivity */
-    pointsMaxWidthBass: { value: 0.5, min: 0, max: 2, label: "Bass Sens" },
-    /** Max Width mid sensitivity */
-    pointsMaxWidthMid: { value: 0.3, min: 0, max: 2, label: "Mid Sens" },
-    /** Max Width high sensitivity */
-    pointsMaxWidthHigh: { value: 0.2, min: 0, max: 2, label: "High Sens" },
-    
-    /** Min Width base value */
-    pointsMinWidth: { value: 6, min: 1, max: 30, label: "Overall" },
-    /** Min Width bass sensitivity */
-    pointsMinWidthBass: { value: 0.5, min: 0, max: 2, label: "Bass Sens" },
-    /** Min Width mid sensitivity */
-    pointsMinWidthMid: { value: 0.3, min: 0, max: 2, label: "Mid Sens" },
-    /** Min Width high sensitivity */
-    pointsMinWidthHigh: { value: 0.2, min: 0, max: 2, label: "High Sens" },
-    
-    /** Pulse Speed base value */
-    pointsPulseSpeed: { value: 6, min: 1, max: 20, label: "Overall" },
-    /** Pulse Speed bass sensitivity */
-    pointsPulseSpeedBass: { value: 0.5, min: 0, max: 2, label: "Bass Sens" },
-    /** Pulse Speed mid sensitivity */
-    pointsPulseSpeedMid: { value: 0.3, min: 0, max: 2, label: "Mid Sens" },
-    /** Pulse Speed high sensitivity */
-    pointsPulseSpeedHigh: { value: 0.2, min: 0, max: 2, label: "High Sens" },
-    
-    // === Audio-reactive Bloom ===
-    /** Bloom intensity base value */
-    bloomIntensity: { value: 0.75, min: 0, max: 3, label: "Intensity" },
+// === Audio-reactive Instanced Points ===
+  // Point Size with 4-slider structure (0-100 range)
+  pointsSizeIntensity: { value: 50, min: 0, max: 100, label: "Intensity" },
+  pointsSizeBass: { value: 80, min: 0, max: 100, label: "Bass" },
+  pointsSizeMid: { value: 40, min: 0, max: 100, label: "Mid" },
+  pointsSizeHigh: { value: 20, min: 0, max: 100, label: "High" },
+
+  // Radial Displacement with 4-slider structure (0-100 range)
+  pointsDisplacementIntensity: { value: 30, min: 0, max: 100, label: "Intensity" },
+  pointsDisplacementBass: { value: 100, min: 0, max: 100, label: "Bass" },
+  pointsDisplacementMid: { value: 50, min: 0, max: 100, label: "Mid" },
+  pointsDisplacementHigh: { value: 20, min: 0, max: 100, label: "High" },
+
+  // Pulse Speed with 4-slider structure (0-100 range)
+  pointsPulseIntensity: { value: 30, min: 0, max: 100, label: "Intensity" },
+  pointsPulseBass: { value: 30, min: 0, max: 100, label: "Bass" },
+  pointsPulseMid: { value: 20, min: 0, max: 100, label: "Mid" },
+  pointsPulseHigh: { value: 10, min: 0, max: 100, label: "High" },
+
+// Rotation Speed with 4-slider structure (0-100 range)
+  pointsRotationIntensity: { value: 20, min: 0, max: 100, label: "Intensity" },
+  pointsRotationBass: { value: 40, min: 0, max: 100, label: "Bass" },
+  pointsRotationMid: { value: 20, min: 0, max: 100, label: "Mid" },
+  pointsRotationHigh: { value: 10, min: 0, max: 100, label: "High" },
+
+  // Curve Count with 4-slider structure (0-100 range)
+  pointsCurveCountIntensity: { value: 30, min: 0, max: 100, label: "Intensity" },
+  pointsCurveCountBass: { value: 60, min: 0, max: 100, label: "Bass" },
+  pointsCurveCountMid: { value: 30, min: 0, max: 100, label: "Mid" },
+  pointsCurveCountHigh: { value: 10, min: 0, max: 100, label: "High" },
+
+  // Wave Travel Speed with 4-slider structure (0-100 range)
+  pointsWaveSpeedIntensity: { value: 40, min: 0, max: 100, label: "Intensity" },
+  pointsWaveSpeedBass: { value: 70, min: 0, max: 100, label: "Bass" },
+  pointsWaveSpeedMid: { value: 40, min: 0, max: 100, label: "Mid" },
+  pointsWaveSpeedHigh: { value: 20, min: 0, max: 100, label: "High" },
+
+  // Wave Length - controls how many points are in the wave chain
+  pointsWaveLength: { value: 30, min: 5, max: 100, label: "Wave Length" },
+
+// === Audio-reactive Bloom ===
+  /** Bloom intensity base value */
+  bloomIntensity: { value: 0.75, min: 0, max: 6, label: "Intensity" },
     /** Bloom bass sensitivity */
     bloomBass: { value: 0.5, min: 0, max: 2, label: "Bass Sens" },
     /** Bloom mid sensitivity */

@@ -476,26 +476,51 @@ export function createPointsGUI(settings, container, onChange, isElectron) {
   // Clear existing content
   container.innerHTML = '';
 
-  // Max Width folder
-  const maxWidthFolder = createFolder('Max Width', container);
-  addSlider(maxWidthFolder.content, settings.pointsMaxWidth, handleChange);
-  addSlider(maxWidthFolder.content, settings.pointsMaxWidthBass, handleChange);
-  addSlider(maxWidthFolder.content, settings.pointsMaxWidthMid, handleChange);
-  addSlider(maxWidthFolder.content, settings.pointsMaxWidthHigh, handleChange);
+  // Point Size folder (4-slider)
+  const sizeFolder = createFolder('Point Size', container);
+  addSlider(sizeFolder.content, settings.pointsSizeIntensity, handleChange);
+  addSlider(sizeFolder.content, settings.pointsSizeBass, handleChange);
+  addSlider(sizeFolder.content, settings.pointsSizeMid, handleChange);
+  addSlider(sizeFolder.content, settings.pointsSizeHigh, handleChange);
 
-  // Min Width folder
-  const minWidthFolder = createFolder('Min Width', container);
-  addSlider(minWidthFolder.content, settings.pointsMinWidth, handleChange);
-  addSlider(minWidthFolder.content, settings.pointsMinWidthBass, handleChange);
-  addSlider(minWidthFolder.content, settings.pointsMinWidthMid, handleChange);
-  addSlider(minWidthFolder.content, settings.pointsMinWidthHigh, handleChange);
+  // Radial Displacement folder (4-slider)
+  const displacementFolder = createFolder('Radial Displacement', container);
+  addSlider(displacementFolder.content, settings.pointsDisplacementIntensity, handleChange);
+  addSlider(displacementFolder.content, settings.pointsDisplacementBass, handleChange);
+  addSlider(displacementFolder.content, settings.pointsDisplacementMid, handleChange);
+  addSlider(displacementFolder.content, settings.pointsDisplacementHigh, handleChange);
 
-  // Pulse Speed folder
+  // Pulse Speed folder (4-slider)
   const pulseFolder = createFolder('Pulse Speed', container);
-  addSlider(pulseFolder.content, settings.pointsPulseSpeed, handleChange);
-  addSlider(pulseFolder.content, settings.pointsPulseSpeedBass, handleChange);
-  addSlider(pulseFolder.content, settings.pointsPulseSpeedMid, handleChange);
-  addSlider(pulseFolder.content, settings.pointsPulseSpeedHigh, handleChange);
+  addSlider(pulseFolder.content, settings.pointsPulseIntensity, handleChange);
+  addSlider(pulseFolder.content, settings.pointsPulseBass, handleChange);
+  addSlider(pulseFolder.content, settings.pointsPulseMid, handleChange);
+  addSlider(pulseFolder.content, settings.pointsPulseHigh, handleChange);
+
+  // Rotation Speed folder (4-slider)
+  const rotationFolder = createFolder('Rotation Speed', container);
+  addSlider(rotationFolder.content, settings.pointsRotationIntensity, handleChange);
+  addSlider(rotationFolder.content, settings.pointsRotationBass, handleChange);
+  addSlider(rotationFolder.content, settings.pointsRotationMid, handleChange);
+  addSlider(rotationFolder.content, settings.pointsRotationHigh, handleChange);
+
+  // Curve Count folder (4-slider)
+  const curveFolder = createFolder('Curve Count', container);
+  addSlider(curveFolder.content, settings.pointsCurveCountIntensity, handleChange);
+  addSlider(curveFolder.content, settings.pointsCurveCountBass, handleChange);
+  addSlider(curveFolder.content, settings.pointsCurveCountMid, handleChange);
+  addSlider(curveFolder.content, settings.pointsCurveCountHigh, handleChange);
+
+  // Wave Speed folder (4-slider) - controls how fast the "snake" travels
+  const waveSpeedFolder = createFolder('Wave Speed', container);
+  addSlider(waveSpeedFolder.content, settings.pointsWaveSpeedIntensity, handleChange);
+  addSlider(waveSpeedFolder.content, settings.pointsWaveSpeedBass, handleChange);
+  addSlider(waveSpeedFolder.content, settings.pointsWaveSpeedMid, handleChange);
+  addSlider(waveSpeedFolder.content, settings.pointsWaveSpeedHigh, handleChange);
+
+  // Wave Length folder (single slider) - controls how many points are in the wave chain
+  const waveLengthFolder = createFolder('Wave Length', container);
+  addSlider(waveLengthFolder.content, settings.pointsWaveLength, handleChange);
 
   // Bloom folder (audio-reactive)
   const bloomFolder = createFolder('Bloom', container);
