@@ -1,8 +1,13 @@
-/**
+/** 
  * @module main
  * @description Main window entry point for the music visualizer.
  * Uses shared bootstrap initialization with Electron-specific features.
  */
+
+console.log('[Main] main.js loaded');
+
+// Immediate check for start button
+console.log('[Main] Looking for start button:', document.getElementById('start-btn'));
 
 import { initVisualization, stopAnimation } from './src/core/bootstrap.js';
 import { initAudio, analyzeAudio, isAudioActive } from './src/audio/capture.js';
@@ -176,51 +181,144 @@ export async function switchSceneWithGUI(sceneType) {
 
 // === Event Listeners ===
 
-// Start button - initialize audio once and start with particles scene
-document.getElementById('start-btn')?.addEventListener('click', async () => {
-  console.log('[Main] Start button clicked');
-  console.log('[Main] User Agent:', navigator.userAgent);
-  console.log('[Main] URL:', window.location.href);
+// Flag to prevent duplicate event listeners
+let startButtonHandlersAttached = false;
+
+// Wait for DOM to be fully loaded before attaching event listeners
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', attachStartButtonHandler);
+} else {
+  attachStartButtonHandler();
+}
+
+function attachStartButtonHandler() {
+  // Prevent duplicate handlers
+  if (startButtonHandlersAttached) {
+    console.log('[Main] Start button handlers already attached, skipping');
+    return;
+  }
+  startButtonHandlersAttached = true;
   
-  await startVisualizer();
-});
+  console.log('[Main] Attaching start button handler');
+  
+  const startBtn = document.getElementById('start-btn');
+  const startOverlay = document.getElementById('start-overlay');
+  
+  if (!startBtn) {
+    console.error('[Main] Start button not found!');
+    return;
+  }
+  
+  if (!startOverlay) {
+    console.error('[Main] Start overlay not found!');
+    return;
+  }
+  
+  console.log('[Main] Found start button and overlay');
+  
+  // Attach click handler to button
+  startBtn.addEventListener('mousedown', () => {
+    console.log('[Main] Start button mousedown detected');
+  });
+  
+  startBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[Main] Start button clicked');
+    console.log('[Main] User Agent:', navigator.userAgent);
+    console.log('[Main] URL:', window.location.href);
+    
+    await startVisualizer();
+  });
+
+  // Also allow clicking the entire overlay (but not the button itself)
+  startOverlay.addEventListener('click', async (e) => {
+    // Only respond if clicking the overlay background or text elements, not interactive elements
+    if (e.target === startOverlay || e.target.tagName === 'H1' || e.target.tagName === 'P') {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[Main] Overlay clicked');
+      await startVisualizer();
+    }
+  });
+  
+  console.log('[Main] Start button handlers attached');
+}
+
+// Make startVisualizer available globally for fallback
+window.startVisualizer = startVisualizer;
+window.handleStartButtonClick = () => {
+  console.log('[Main] Fallback button click handler');
+  startVisualizer();
+};
+
+// Flag to prevent multiple simultaneous calls to startVisualizer
+let isStarting = false;
 
 // Auto-start for OBS Browser Source or when ?autostart=true
 async function startVisualizer() {
-  document.getElementById('start-overlay').style.display = 'none';
-
-  // Check if we should use dummy audio
-  const urlParams = new URLSearchParams(window.location.search);
-  const isOBS = navigator.userAgent.toLowerCase().includes('obs') || 
-                navigator.userAgent.toLowerCase().includes('cef') ||
-                urlParams.get('obs') === 'true';
-  const useDummyAudio = urlParams.get('audio') === 'dummy' || isOBS;
+  // Prevent multiple simultaneous executions
+  if (isStarting) {
+    console.log('[Main] startVisualizer already running, skipping duplicate call');
+    return;
+  }
   
-  if (isOBS) {
-    console.log('[Main] OBS Browser Source detected - using dummy audio');
+  if (audioInitialized) {
+    console.log('[Main] Audio already initialized, just hiding overlay');
+    document.getElementById('start-overlay').style.display = 'none';
+    return;
   }
-  if (useDummyAudio) {
-    console.log('[Main] Dummy audio mode - no permission dialogs');
-  }
+  
+  isStarting = true;
 
-  // Initialize audio only once
-  if (!audioInitialized) {
-    console.log('[Main] Initializing audio...');
-    try {
-      await initAudio();
-      audioInitialized = true;
-      console.log('[Main] Audio initialized');
-    } catch (err) {
-      console.error('[Main] Audio init failed:', err);
-      // Continue anyway - scene will still render
+  try {
+    document.getElementById('start-overlay').style.display = 'none';
+
+    // Check if we should use dummy audio
+    const urlParams = new URLSearchParams(window.location.search);
+    const isOBS = navigator.userAgent.toLowerCase().includes('obs') ||
+      navigator.userAgent.toLowerCase().includes('cef') ||
+      urlParams.get('obs') === 'true';
+    const useDummyAudio = urlParams.get('audio') === 'dummy' || isOBS;
+
+    if (isOBS) {
+      console.log('[Main] OBS Browser Source detected - using dummy audio');
     }
-  }
+    if (useDummyAudio) {
+      console.log('[Main] Dummy audio mode - no permission dialogs');
+    }
 
-  // Start with particles scene (or scene from URL)
-  const sceneParam = urlParams.get('scene') || 'particles';
-  console.log('[Main] Starting scene:', sceneParam);
-  await init(sceneParam);
-  console.log('[Main] Initialization complete');
+    // Initialize audio only once
+    if (!audioInitialized) {
+      console.log('[Main] Initializing audio...');
+      try {
+        await initAudio();
+        audioInitialized = true;
+        console.log('[Main] Audio initialized');
+      } catch (err) {
+        console.error('[Main] Audio init failed:', err);
+        // Continue anyway - scene will still render
+      }
+    }
+
+    // Start with particles scene (or scene from URL)
+    const sceneParam = urlParams.get('scene') || 'particles';
+    console.log('[Main] Starting scene:', sceneParam);
+
+    await init(sceneParam);
+    console.log('[Main] Initialization complete');
+  } catch (err) {
+    console.error('[Main] Start visualizer failed:', err);
+    // Show error to user
+    const audioStatus = document.getElementById('audio-status');
+    if (audioStatus) {
+      audioStatus.textContent = 'Error: Failed to start';
+      audioStatus.className = 'error';
+    }
+  } finally {
+    // Reset the flag whether successful or not
+    isStarting = false;
+  }
 }
 
 // Auto-start if requested

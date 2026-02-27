@@ -150,11 +150,30 @@ function setupAudioContext(audioTrack) {
 
 /**
  * Show audio source selector UI (Electron mode).
+ * Prevents duplicate selectors from being shown.
  */
+let isAudioSelectorShowing = false;
+
 function showAudioSourceSelector() {
-    showAudioSelector(audioSources, (source) => {
-        selectAudioSource(source);
-    });
+  // Prevent duplicate selectors
+  if (isAudioSelectorShowing) {
+    console.log('[Audio] Audio selector already showing, not creating duplicate');
+    return;
+  }
+  
+  // Also check if one already exists in DOM
+  const existingSelector = document.getElementById('audio-selector');
+  if (existingSelector) {
+    console.log('[Audio] Audio selector already exists in DOM, removing old one');
+    existingSelector.remove();
+  }
+  
+  isAudioSelectorShowing = true;
+  
+  showAudioSelector(audioSources, (source) => {
+    isAudioSelectorShowing = false;
+    selectAudioSource(source);
+  });
 }
 
 /**
@@ -163,10 +182,13 @@ function showAudioSourceSelector() {
  * @returns {Promise<boolean>}
  */
 export async function selectAudioSource(source) {
-    const selector = document.getElementById('audio-selector');
-    if (selector) selector.remove();
-    
-    setAudioConnecting();
+  const selector = document.getElementById('audio-selector');
+  if (selector) selector.remove();
+  
+  // Reset the flag when selector is removed
+  isAudioSelectorShowing = false;
+  
+  setAudioConnecting();
     
     try {
         let audioTrack = null;

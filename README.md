@@ -22,7 +22,7 @@ npm install
 npm start
 ```
 
-Open http://localhost:3002 in your browser.
+Open http://localhost:port in your browser.
 
 > **Note:** Browser version uses screen/tab sharing for audio. For system audio capture, use the Electron version.
 

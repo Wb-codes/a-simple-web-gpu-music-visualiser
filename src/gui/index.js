@@ -5,8 +5,23 @@
  */
 
 import { SCENE_NAMES } from '../core/constants.js';
-import { ANIMATION_NAMES, DEFAULT_ANIMATION } from '../core/animations.js';
-import { switchAnimation } from '../scenes/skinning.js';
+import { ANIMATION_NAMES, DEFAULT_ANIMATION, DYNAMIC_ANIMATION_NAMES } from '../core/animations.js';
+import { 
+  AVAILABLE_MODELS, 
+  switchAnimation, 
+  loadModel, 
+  importGLBFile, 
+  reloadCurrentModel,
+  setOnAnimationsLoaded,
+  getAvailableAnimations,
+  DISCOVERED_GLBS,
+  scanSkinningFolder,
+  loadAdditionalModel,
+  toggleModelVisibility,
+  loadedAdditionalModels,
+  removeAdditionalModel,
+  currentModelPath
+} from '../scenes/skinning.js';
 import { applyFadeBehavior, removeAllFadeBehaviors, applyFadeToSettingsButton } from './fade-manager.js';
 
 export { removeAllFadeBehaviors };
@@ -687,39 +702,235 @@ export function createParticlesGUI(settings, container, onChange, isElectron) {
  * @param {boolean} isElectron - Whether running in Electron mode
  */
 export function createSkinningGUI(settings, container, onChange, isElectron) {
-    const handleChange = () => {
-        if (onChange) onChange();
+  const handleChange = () => {
+    if (onChange) onChange();
+  };
+
+  // Get toggle button
+  const toggleBtn = document.getElementById('toggle-controls');
+
+  // Setup toggle button
+  if (toggleBtn) {
+    toggleBtn.classList.add('visible');
+    toggleBtn.textContent = 'Hide';
+    toggleBtn.onclick = () => {
+      container.classList.toggle('visible');
+      toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
     };
-    
-    // Get toggle button
-    const toggleBtn = document.getElementById('toggle-controls');
-    
-    // Setup toggle button
-    if (toggleBtn) {
-        toggleBtn.classList.add('visible');
-        toggleBtn.textContent = 'Hide';
-        toggleBtn.onclick = () => {
-            container.classList.toggle('visible');
-            toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
-        };
+  }
+
+  // Clear existing content
+  container.innerHTML = '';
+
+  // Model Selection folder
+  const modelFolder = createFolder('Model', container);
+  
+  // Model selector dropdown
+  const modelLabel = document.createElement('label');
+  modelLabel.textContent = 'Select Model:';
+  modelLabel.style.cssText = 'color: #fff; font-size: 12px; display: block; margin-bottom: 5px;';
+  modelFolder.content.appendChild(modelLabel);
+  
+  const modelSelect = document.createElement('select');
+  modelSelect.style.cssText = `
+    width: 100%;
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 6px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 10px;
+  `;
+  
+  // Add available models
+  AVAILABLE_MODELS.forEach((model, index) => {
+    const option = document.createElement('option');
+    option.value = model.path;
+    option.textContent = model.name;
+    if (index === 0) option.selected = true;
+    modelSelect.appendChild(option);
+  });
+  
+  modelFolder.content.appendChild(modelSelect);
+  
+  // Reload button
+  const reloadBtn = document.createElement('button');
+  reloadBtn.textContent = '↻ Reload Model';
+  reloadBtn.style.cssText = `
+    background: #444;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 6px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 5px;
+  `;
+  reloadBtn.onmouseenter = () => reloadBtn.style.background = '#555';
+  reloadBtn.onmouseleave = () => reloadBtn.style.background = '#444';
+  reloadBtn.onclick = async () => {
+    reloadBtn.textContent = 'Loading...';
+    reloadBtn.disabled = true;
+    try {
+      // Get current app context (renderer, camera, controls)
+      // This will be handled by the scene reload
+      await reloadCurrentModel();
+      reloadBtn.textContent = '↻ Reload Model';
+    } catch (error) {
+      reloadBtn.textContent = 'Error! Retry';
     }
+    reloadBtn.disabled = false;
+  };
+  modelFolder.content.appendChild(reloadBtn);
+  
+  // Handle model selection change
+  modelSelect.addEventListener('change', async (e) => {
+    const selectedPath = e.target.value;
+    modelSelect.disabled = true;
+    reloadBtn.textContent = 'Loading...';
+    try {
+      await loadModel(selectedPath);
+      // Animation picker will be updated via callback
+    } catch (error) {
+      console.error('Failed to load model:', error);
+      reloadBtn.textContent = 'Error Loading';
+    }
+    modelSelect.disabled = false;
+    reloadBtn.textContent = '↻ Reload Model';
+  });
+
+  // File Import folder
+  const importFolder = createFolder('Import GLB', container);
+  
+  // Drop zone
+  const dropZone = document.createElement('div');
+  dropZone.id = 'glb-drop-zone';
+  dropZone.style.cssText = `
+    border: 2px dashed #555;
+    border-radius: 5px;
+    padding: 20px;
+    text-align: center;
+    color: #888;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(30, 30, 30, 0.5);
+  `;
+  dropZone.innerHTML = `
+    <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
+    <div>Drop GLB file here</div>
+    <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
+  `;
+  
+  // Drag effects
+  dropZone.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = '#667eea';
+    dropZone.style.background = 'rgba(102, 126, 234, 0.1)';
+  });
+  
+  dropZone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = '#555';
+    dropZone.style.background = 'rgba(30, 30, 30, 0.5)';
+  });
+  
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+  
+  dropZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = '#555';
+    dropZone.style.background = 'rgba(30, 30, 30, 0.5)';
     
-    // Clear existing content
-    container.innerHTML = '';
-    
-    // Bloom folder
-    const bloomFolder = createFolder('Bloom', container);
-    addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);
-    addSlider(bloomFolder.content, settings.bloomBass, handleChange);
-    addSlider(bloomFolder.content, settings.bloomMid, handleChange);
-    addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
-    
-    // Output folder
-    const outputFolder = createFolder('Output', container);
-    addSlider(outputFolder.content, settings.autoRotate, handleChange);
-    addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
-    addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
-    
+    const files = e.dataTransfer.files;
+    if (files.length > 0 && files[0].name.endsWith('.glb')) {
+      await handleGLBImport(files[0]);
+    } else {
+      dropZone.innerHTML = `<div style="color: #ff6b6b;">Please drop a .glb file</div>`;
+      setTimeout(() => {
+        dropZone.innerHTML = `
+          <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
+          <div>Drop GLB file here</div>
+          <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
+        `;
+      }, 2000);
+    }
+  });
+  
+  // Click to browse
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.glb';
+  fileInput.style.display = 'none';
+  fileInput.addEventListener('change', async (e) => {
+    if (e.target.files.length > 0) {
+      await handleGLBImport(e.target.files[0]);
+    }
+  });
+  
+  dropZone.addEventListener('click', () => fileInput.click());
+  
+  importFolder.content.appendChild(dropZone);
+  importFolder.content.appendChild(fileInput);
+  
+  // Import handler
+  async function handleGLBImport(file) {
+    dropZone.innerHTML = `<div style="color: #667eea;">Loading ${file.name}...</div>`;
+    try {
+      await importGLBFile(file);
+      
+      // Add to model dropdown
+      const option = document.createElement('option');
+      option.value = file.name;
+      option.textContent = file.name.replace('.glb', '');
+      modelSelect.appendChild(option);
+      option.selected = true;
+      
+      dropZone.innerHTML = `
+        <div style="color: #51cf66;">✓ ${file.name} loaded!</div>
+      `;
+      setTimeout(() => {
+        dropZone.innerHTML = `
+          <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
+          <div>Drop GLB file here</div>
+          <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
+        `;
+      }, 3000);
+      
+      if (onChange) onChange();
+    } catch (error) {
+      console.error('Import failed:', error);
+      dropZone.innerHTML = `
+        <div style="color: #ff6b6b;">Failed to load</div>
+      `;
+      setTimeout(() => {
+        dropZone.innerHTML = `
+          <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
+          <div>Drop GLB file here</div>
+          <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
+        `;
+      }, 3000);
+    }
+  }
+
+  // Bloom folder
+  const bloomFolder = createFolder('Bloom', container);
+  addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);
+  addSlider(bloomFolder.content, settings.bloomBass, handleChange);
+  addSlider(bloomFolder.content, settings.bloomMid, handleChange);
+  addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
+
+  // Output folder
+  const outputFolder = createFolder('Output', container);
+  addSlider(outputFolder.content, settings.autoRotate, handleChange);
+  addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
+  addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
+
   // Spout controls (Electron only)
   if (isElectron) {
     createSpoutControls(outputFolder.content, settings, async (enabled) => {
@@ -759,12 +970,130 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
   // Apply fade behavior to settings panel
   applyFadeBehavior(container);
 
-  // Create animation picker (top center)
-  createAnimationPicker(settings.currentAnimation.value, ANIMATION_NAMES, (animationName) => {
-    settings.currentAnimation.value = animationName;
-    switchAnimation(animationName); // Update the actual animation in the scene
-    if (onChange) onChange();
+  // Create the top bar with all three dropdowns
+  let modelPickersContainer = null;
+  
+  async function createModelPickers() {
+    // Remove old pickers
+    if (modelPickersContainer) {
+      modelPickersContainer.remove();
+    }
+    
+    // Scan for GLB files
+    await scanSkinningFolder();
+    
+    // Create container for all pickers
+    modelPickersContainer = document.createElement('div');
+    modelPickersContainer.id = 'model-pickers-container';
+    modelPickersContainer.style.cssText = `
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      background: rgba(20, 23, 26, 0.9);
+      padding: 8px 16px;
+      border-radius: 5px;
+    `;
+    
+  // === LEFT: Animated Models Dropdown ===
+  const animatedContainer = createModelDropdown(
+    'Animated Models',
+    DISCOVERED_GLBS.animated,
+    true, // has checkboxes
+    async (modelName, isChecked) => {
+      if (isChecked) {
+        // Load the model
+        const modelInfo = DISCOVERED_GLBS.animated.find(m => m.name === modelName);
+        if (modelInfo) {
+          try {
+            // First unload any other animated models to keep only one active
+            for (const [name, data] of loadedAdditionalModels) {
+              if (data.hasAnimations && name !== modelName) {
+                removeAdditionalModel(name);
+              }
+            }
+            await loadAdditionalModel(modelInfo.path, true);
+          } catch (error) {
+            console.error('Failed to load animated model:', error);
+          }
+        }
+      } else {
+        // Unload the model completely when unchecked
+        removeAdditionalModel(modelName);
+      }
+    }
+  );
+    
+  // === CENTER: Animation Picker ===
+  const availableAnims = getAvailableAnimations();
+  console.log(`[GUI] Creating animation picker with ${availableAnims.length} animations:`, availableAnims);
+  
+  const animationContainer = createAnimationPicker(
+    settings.currentAnimation.value,
+    availableAnims,
+    (animationName) => {
+      console.log(`[GUI] Animation selected: ${animationName}`);
+      settings.currentAnimation.value = animationName;
+      const result = switchAnimation(animationName);
+      console.log(`[GUI] switchAnimation result: ${result}`);
+      if (onChange) onChange();
+    }
+  );
+    // Remove fade behavior from animation picker (handled by container)
+    animationContainer.style.position = 'static';
+    animationContainer.style.transform = 'none';
+    animationContainer.style.background = 'transparent';
+    
+  // === RIGHT: Static Models Dropdown ===
+  const staticContainer = createModelDropdown(
+    'Static Models',
+    DISCOVERED_GLBS.static,
+    true, // has checkboxes
+    async (modelName, isChecked) => {
+      console.log(`[GUI] Static model ${modelName} checkbox changed: ${isChecked}`);
+      if (isChecked) {
+        // Load the model
+        const modelInfo = DISCOVERED_GLBS.static.find(m => m.name === modelName);
+        console.log(`[GUI] Looking for static model info:`, modelInfo);
+        if (modelInfo) {
+          try {
+            console.log(`[GUI] Loading static model: ${modelInfo.path}`);
+            await loadAdditionalModel(modelInfo.path, true);
+          } catch (error) {
+            console.error('[GUI] Failed to load static model:', error);
+          }
+        } else {
+          console.warn(`[GUI] Static model ${modelName} not found in DISCOVERED_GLBS.static`);
+        }
+      } else {
+        // Unload the model completely when unchecked
+        console.log(`[GUI] Unloading static model: ${modelName}`);
+        removeAdditionalModel(modelName);
+      }
+    }
+  );
+    
+    modelPickersContainer.appendChild(animatedContainer);
+    modelPickersContainer.appendChild(animationContainer);
+    modelPickersContainer.appendChild(staticContainer);
+    document.body.appendChild(modelPickersContainer);
+    
+    // Apply fade behavior to the whole container
+    applyFadeBehavior(modelPickersContainer);
+  }
+  
+  // Set up callback for when animations load
+  setOnAnimationsLoaded((animationNames, defaultAnimation) => {
+    // Refresh the pickers when animations change
+    createModelPickers();
   });
+  
+  // Create initial pickers
+  createModelPickers();
 }
 
 /**
@@ -851,6 +1180,182 @@ export function createAnimationPicker(currentAnimation, animationOptions, onChan
 export function removeAnimationPicker() {
   const picker = document.getElementById('animation-picker');
   if (picker) picker.remove();
+  
+  // Also remove the model pickers container
+  const modelPickers = document.getElementById('model-pickers-container');
+  if (modelPickers) modelPickers.remove();
+}
+
+/**
+ * Create a model dropdown with checkboxes
+ * @param {string} title - Title for the dropdown
+ * @param {Array<{name: string, path: string}>} models - Array of model objects
+ * @param {boolean} hasCheckboxes - Whether to show checkboxes
+ * @param {Function} onToggle - Callback when checkbox is toggled (modelName, isChecked)
+ * @returns {HTMLElement} The created dropdown container
+ */
+function createModelDropdown(title, models, hasCheckboxes, onToggle) {
+  const container = document.createElement('div');
+  container.style.cssText = `
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  `;
+  
+  // Create label
+  const label = document.createElement('label');
+  label.textContent = title;
+  label.style.cssText = `
+    color: #fff;
+    font-size: 11px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    white-space: nowrap;
+    text-align: center;
+    margin-bottom: 4px;
+  `;
+  container.appendChild(label);
+  
+  // Create dropdown button
+  const dropdownBtn = document.createElement('button');
+  dropdownBtn.textContent = `${models.length} models ▼`;
+  dropdownBtn.style.cssText = `
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    min-width: 120px;
+    text-align: left;
+  `;
+  container.appendChild(dropdownBtn);
+  
+  // Create dropdown menu
+  const menu = document.createElement('div');
+  menu.style.cssText = `
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #222;
+    border: 1px solid #555;
+    border-radius: 3px;
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 300;
+    min-width: 150px;
+  `;
+  
+  // Toggle dropdown visibility
+  let isOpen = false;
+  dropdownBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isOpen = !isOpen;
+    menu.style.display = isOpen ? 'block' : 'none';
+    dropdownBtn.textContent = `${models.length} models ${isOpen ? '▲' : '▼'}`;
+  });
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', () => {
+    if (isOpen) {
+      isOpen = false;
+      menu.style.display = 'none';
+      dropdownBtn.textContent = `${models.length} models ▼`;
+    }
+  });
+  
+  // Populate menu with model items
+  models.forEach((model) => {
+    const item = document.createElement('div');
+    item.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #333;
+    `;
+    
+    // Checkbox
+    if (hasCheckboxes) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.style.cssText = `
+        cursor: pointer;
+        width: 14px;
+        height: 14px;
+      `;
+      // Check if model is loaded AND visible
+      const modelData = loadedAdditionalModels.get(model.name);
+      checkbox.checked = modelData ? modelData.visible : false;
+      
+      checkbox.addEventListener('change', (e) => {
+        e.stopPropagation();
+        if (onToggle) {
+          onToggle(model.name, checkbox.checked);
+        }
+      });
+      
+      item.appendChild(checkbox);
+    }
+    
+    // Model name
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = model.name;
+    nameSpan.style.cssText = 'flex: 1;';
+    item.appendChild(nameSpan);
+    
+    // Animation count badge (for animated models)
+    if (model.animationCount > 0) {
+      const badge = document.createElement('span');
+      badge.textContent = `${model.animationCount} anim`;
+      badge.style.cssText = `
+        font-size: 9px;
+        color: #888;
+        background: #333;
+        padding: 1px 4px;
+        border-radius: 2px;
+      `;
+      item.appendChild(badge);
+    }
+    
+    // Hover effect
+    item.addEventListener('mouseenter', () => {
+      item.style.background = '#333';
+    });
+    item.addEventListener('mouseleave', () => {
+      item.style.background = 'transparent';
+    });
+    
+    menu.appendChild(item);
+  });
+  
+  // If no models
+  if (models.length === 0) {
+    const emptyItem = document.createElement('div');
+    emptyItem.textContent = 'No models found';
+    emptyItem.style.cssText = `
+      padding: 6px 12px;
+      color: #666;
+      font-size: 12px;
+      font-style: italic;
+    `;
+    menu.appendChild(emptyItem);
+  }
+  
+  // Position menu below dropdown
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position: relative;';
+  wrapper.appendChild(dropdownBtn);
+  wrapper.appendChild(menu);
+  container.appendChild(wrapper);
+  
+  return container;
 }
 
 /**

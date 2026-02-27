@@ -11,3 +11,10 @@ node_modules/
 # Documentation files (keep only README.md)
 *.md
 !README.md
+
+# Docker configuration files
+Dockerfile
+docker-compose.yml
+docker-compose.yaml
+.dockerignore
+docker/

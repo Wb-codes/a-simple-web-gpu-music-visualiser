@@ -96,7 +96,7 @@ export async function initRenderer(options = {}) {
   try {
     console.log('[Renderer] Creating camera...');
     // Create camera
-    camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+    camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 10000);
     camera.position.set(0, 0, 15);
     console.log('[Renderer] Camera created');
 

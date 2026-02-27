@@ -189,17 +189,46 @@
 </script>
 </head>
 <body>
-  <div id="start-overlay">
-    <h1>Music Visualizer</h1>
-    <p>Click to start the visualizer</p>
-    <div class="scene-select">
-      <button class="scene-btn" id="start-btn">Start Visualizer</button>
-    </div>
+<div id="start-overlay">
+  <h1>Music Visualizer</h1>
+  <p>Click to start the visualizer</p>
+  <div class="scene-select">
+    <button class="scene-btn" id="start-btn" onclick="window.handleStartButtonClick && window.handleStartButtonClick()">Start Visualizer</button>
   </div>
+</div>
+<script>
+// Inline debugging - runs immediately
+console.log('[HTML] Inline script running');
+console.log('[HTML] Start button element:', document.getElementById('start-btn'));
+</script>
     <div id="audio-status">Audio: Waiting...</div>
     <button id="toggle-controls">Settings</button>
     <div id="scene-indicator">Scene: <span id="scene-name">-</span> (click to change)</div>
     <div id="controls"></div>
-    <script type="module" src="main.js"></script>
+    <script type="module">
+import('./main.js').then(() => {
+  console.log('[HTML] main.js loaded successfully');
+}).catch(err => {
+  console.error('[HTML] Failed to load main.js:', err);
+  document.getElementById('audio-status').textContent = 'Error loading: ' + err.message;
+  document.getElementById('audio-status').style.color = '#f87171';
+});
+</script>
+<script>
+// Fallback error handler for module loading
+window.addEventListener('error', function(e) {
+  console.error('JavaScript Error:', e);
+  const audioStatus = document.getElementById('audio-status');
+  if (audioStatus) {
+    audioStatus.textContent = 'Error: Check console';
+    audioStatus.style.color = '#f87171';
+  }
+});
+
+// Check if module loaded
+setTimeout(() => {
+  console.log('[HTML] Page loaded, checking if main.js executed...');
+}, 100);
+</script>
 </body>
 </html>

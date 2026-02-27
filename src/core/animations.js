@@ -1,13 +1,14 @@
 /**
  * @module core/animations
- * @description Animation name mappings for the skinning scene.
- * Converts between clean display names and full GLB animation names.
+ * @description Animation name mappings and dynamic animation detection for GLB files.
+ * Supports both predefined animations and runtime detection from loaded models.
  */
 
 /**
- * Animation data from ANIMATION_LIST.md
+ * Animation data from ANIMATION_LIST.md (legacy support)
  * Format: { cleanName: fullName }
  * fullName format: VRM|Name@frameCount
+ * @deprecated Use dynamic animation detection instead
  */
 export const ANIMATION_MAP = {
   'Action': 'VRM|Action@48',
@@ -70,23 +71,114 @@ export const ANIMATION_MAP = {
 };
 
 /**
- * Array of clean animation names for dropdown options
+ * Dynamic animation map - populated at runtime from loaded GLB
+ * @type {Object.<string, string>}
+ */
+export let DYNAMIC_ANIMATION_MAP = {};
+
+/**
+ * Dynamic animation names - populated at runtime
  * @type {string[]}
  */
-export const ANIMATION_NAMES = Object.keys(ANIMATION_MAP);
+export let DYNAMIC_ANIMATION_NAMES = [];
 
 /**
  * Default animation name
  * @type {string}
  */
-export const DEFAULT_ANIMATION = 'DanceLoop';
+export let DEFAULT_ANIMATION = 'DanceLoop';
+
+/**
+ * Static animation names (for backward compatibility)
+ * @type {string[]}
+ */
+export const ANIMATION_NAMES = Object.keys(ANIMATION_MAP);
+
+/**
+ * Currently loaded model path
+ * @type {string|null}
+ */
+export let CURRENT_MODEL_PATH = null;
+
+/**
+ * Build animation map from GLB animation clips
+ * Automatically detects animation naming patterns and creates clean names
+ * @param {Array<THREE.AnimationClip>} animations - Animation clips from GLB
+ * @param {string} modelPath - Path to the loaded model
+ * @returns {Object} Object containing map, names array, and default animation
+ */
+export function buildAnimationMapFromGLB(animations, modelPath) {
+  const map = {};
+  
+  animations.forEach(clip => {
+    // Extract clean name from various formats
+    const cleanName = extractAnimationName(clip.name);
+    map[cleanName] = clip.name;
+  });
+  
+  DYNAMIC_ANIMATION_MAP = map;
+  DYNAMIC_ANIMATION_NAMES = Object.keys(map).sort();
+  DEFAULT_ANIMATION = DYNAMIC_ANIMATION_NAMES[0] || '';
+  CURRENT_MODEL_PATH = modelPath;
+  
+  console.log('Dynamic animations detected:', DYNAMIC_ANIMATION_NAMES);
+  
+  return {
+    map,
+    names: DYNAMIC_ANIMATION_NAMES,
+    defaultAnimation: DEFAULT_ANIMATION
+  };
+}
+
+/**
+ * Extract clean animation name from various GLB naming formats
+ * Supports:
+ * - VRM format: VRM|Name@frame → Name
+ * - Standard: Name|Action → Name Action
+ * - Simple: Walk → Walk
+ * - With numbers: Walk_01 → Walk
+ * @param {string} fullName - Raw animation name from GLB
+ * @returns {string} Clean, readable animation name
+ */
+function extractAnimationName(fullName) {
+  let name = fullName;
+  
+  // Remove VRM| prefix if present
+  if (name.includes('|')) {
+    name = name.split('|')[1] || name;
+  }
+  
+  // Remove @frame suffix if present
+  if (name.includes('@')) {
+    name = name.split('@')[0];
+  }
+  
+  // Remove trailing numbers and underscores (e.g., Walk_01 → Walk)
+  name = name.replace(/[_\-]\d+$/g, '');
+  
+  // Convert camelCase or PascalCase to readable format
+  // e.g., "WalkLoop" → "Walk Loop"
+  name = name.replace(/([a-z])([A-Z])/g, '$1 $2');
+  
+  // Clean up any extra spaces
+  name = name.trim();
+  
+  return name || fullName;
+}
 
 /**
  * Get the full GLB animation name from a clean name
+ * First checks dynamic map (runtime), falls back to static map (legacy)
  * @param {string} cleanName - Clean animation name (e.g., 'DanceLoop')
  * @returns {string|null} Full animation name (e.g., 'VRM|DanceLoop@24') or null if not found
  */
 export function getFullAnimationName(cleanName) {
+  // First check dynamic map (runtime loaded animations)
+  if (DYNAMIC_ANIMATION_MAP[cleanName]) {
+    return DYNAMIC_ANIMATION_MAP[cleanName];
+  }
+  
+  // Fall back to static map (legacy support)
   return ANIMATION_MAP[cleanName] || null;
 }
 
@@ -96,6 +188,40 @@ export function getFullAnimationName(cleanName) {
  * @returns {string|null} Clean animation name (e.g., 'DanceLoop') or null if not found
  */
 export function getCleanAnimationName(fullName) {
-  const entry = Object.entries(ANIMATION_MAP).find(([_, full]) => full === fullName);
-  return entry ? entry[0] : null;
+  // First check dynamic map
+  const dynamicEntry = Object.entries(DYNAMIC_ANIMATION_MAP).find(([_, full]) => full === fullName);
+  if (dynamicEntry) return dynamicEntry[0];
+  
+  // Fall back to static map
+  const staticEntry = Object.entries(ANIMATION_MAP).find(([_, full]) => full === fullName);
+  return staticEntry ? staticEntry[0] : null;
+}
+
+/**
+ * Clear dynamic animation data
+ * Call this when loading a new model
+ */
+export function clearDynamicAnimations() {
+  DYNAMIC_ANIMATION_MAP = {};
+  DYNAMIC_ANIMATION_NAMES = [];
+  DEFAULT_ANIMATION = '';
+  CURRENT_MODEL_PATH = null;
+}
+
+/**
+ * Array of clean animation names for dropdown options
+ * Returns dynamic names if available, otherwise static names
+ * @type {string[]}
+ */
+export function getAnimationNames() {
+  return DYNAMIC_ANIMATION_NAMES.length > 0 ? DYNAMIC_ANIMATION_NAMES : Object.keys(ANIMATION_MAP);
+}
+
+/**
+ * Get the default animation name
+ * Returns dynamic default if available, otherwise static default
+ * @type {string}
+ */
+export function getDefaultAnimation() {
+  return DEFAULT_ANIMATION || 'DanceLoop';
 }
