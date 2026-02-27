@@ -1,0 +1,16 @@
+{
+  "models": [
+    {
+      "name": "Michelle",
+      "path": "models/gltf/skinning/Michelle.glb"
+    },
+    {
+      "name": "Boltvis",
+      "path": "models/gltf/skinning/boltvis.glb"
+    },
+    {
+      "name": "Cliptest",
+      "path": "models/gltf/skinning/cliptest.glb"
+    }
+  ]
+}

@@ -51,40 +51,66 @@ export const loadedAdditionalModels = new Map();
 
 /**
  * Scan the skinning folder for GLB files
- * This would ideally be done server-side, but for now we'll scan a predefined list
+ * Uses a manifest file (index.json) if available, falls back to hardcoded list
+ * Loads each GLB to verify animations and categorize accordingly
  * @returns {Promise<Object>} Object with animated and static arrays
  */
 export async function scanSkinningFolder() {
-  // In a real implementation, this would read the directory
-  // For now, we'll check the AVAILABLE_MODELS and categorize them
   const skinningPath = 'models/gltf/skinning/';
+  let fileList = [];
   
-  // List of expected GLB files in the skinning folder
-  const expectedFiles = [
-    'Michelle.glb',
-    'boltvis.glb'
-  ];
-  
+  // Reset discovered lists
   DISCOVERED_GLBS.animated = [];
   DISCOVERED_GLBS.static = [];
   
+  // Try to load manifest file first (backward compatible)
+  try {
+    const response = await fetch(skinningPath + 'index.json');
+    if (response.ok) {
+      const manifest = await response.json();
+      fileList = manifest.models.map(m => ({
+        file: m.path.split('/').pop(),
+        path: m.path
+      }));
+      console.log(`[Skinning] Loaded ${fileList.length} models from manifest`);
+    } else {
+      throw new Error('Manifest not found');
+    }
+  } catch (error) {
+    // Fallback to hardcoded list (backward compatibility)
+    console.log('[Skinning] Manifest not found, using hardcoded list');
+    fileList = [
+      { file: 'Michelle.glb', path: 'models/gltf/skinning/Michelle.glb' },
+      { file: 'boltvis.glb', path: 'models/gltf/skinning/boltvis.glb' },
+      { file: 'cliptest.glb', path: 'models/gltf/skinning/cliptest.glb' }
+    ];
+  }
+  
+  // Update AVAILABLE_MODELS to match discovered files for GUI dropdown
+  AVAILABLE_MODELS.length = 0;
+  fileList.forEach(({ file, path }) => {
+    AVAILABLE_MODELS.push({ name: file.replace('.glb', ''), path: path });
+  });
+  
+  // Verify each file by loading it
   const loader = new GLTFLoader();
   
-  for (const fileName of expectedFiles) {
+  for (const { file, path } of fileList) {
     try {
+      console.log(`[Skinning] Scanning ${file}...`);
       const gltf = await new Promise((resolve, reject) => {
-        loader.load(skinningPath + fileName, resolve, undefined, reject);
+        loader.load(path, resolve, undefined, reject);
       });
       
       const hasAnimations = gltf.animations && gltf.animations.length > 0;
       const modelInfo = {
-        name: fileName.replace('.glb', ''),
-        path: skinningPath + fileName,
+        name: file.replace('.glb', ''),
+        path: path,
         hasAnimations: hasAnimations,
         animationCount: hasAnimations ? gltf.animations.length : 0
       };
       
-      console.log(`[Skinning] Scanned ${fileName}: animations=${hasAnimations ? gltf.animations.length : 0}`);
+      console.log(`[Skinning] Scanned ${file}: animations=${modelInfo.animationCount}`);
       
       if (hasAnimations) {
         DISCOVERED_GLBS.animated.push(modelInfo);
@@ -92,12 +118,14 @@ export async function scanSkinningFolder() {
         DISCOVERED_GLBS.static.push(modelInfo);
       }
     } catch (error) {
-      console.warn(`Failed to scan ${fileName}:`, error);
+      console.warn(`[Skinning] Failed to scan ${file}:`, error);
     }
   }
   
-  console.log('Discovered animated GLBs:', DISCOVERED_GLBS.animated);
-  console.log('Discovered static GLBs:', DISCOVERED_GLBS.static);
+  console.log('[Skinning] Scan complete:', {
+    animated: DISCOVERED_GLBS.animated.length,
+    static: DISCOVERED_GLBS.static.length
+  });
   
   return DISCOVERED_GLBS;
 }
