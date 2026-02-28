@@ -878,51 +878,65 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
   importFolder.content.appendChild(dropZone);
   importFolder.content.appendChild(fileInput);
   
-  // Import handler
-  async function handleGLBImport(file) {
-    dropZone.innerHTML = `<div style="color: #667eea;">Loading ${file.name}...</div>`;
-    try {
-      const result = await importGLBFile(file);
-      
-      // Add to model dropdown
+// Import handler
+async function handleGLBImport(file) {
+  console.log(`[GUI] Starting import for: ${file.name}`);
+  dropZone.innerHTML = `<div style="color: #667eea;">Importing ${file.name}...</div>`;
+  
+  try {
+    const result = await importGLBFile(file);
+    console.log(`[GUI] Import result:`, result);
+
+    // Add to model dropdown - check if option already exists
+    // Use the indexeddb:// path format for proper loading
+    const indexedPath = `indexeddb://${result.modelName}.glb`;
+    console.log(`[GUI] Adding to dropdown with path: ${indexedPath}`);
+    
+    const existingOption = Array.from(modelSelect.options).find(opt => opt.value === indexedPath);
+    if (!existingOption) {
       const option = document.createElement('option');
-      option.value = result.modelName;
+      option.value = indexedPath;
       option.textContent = result.modelName;
       modelSelect.appendChild(option);
-      option.selected = true;
-      
-      // NEW: Refresh model pickers to show in checkbox lists
-      await createModelPickers();
-      
-      dropZone.innerHTML = `
-        <div style="color: #51cf66;">✓ ${file.name} loaded! (${result.hasAnimations ? 'Animated' : 'Static'})</div>
-      `;
-      setTimeout(() => {
-        dropZone.innerHTML = `
-          <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
-          <div>Drop GLB file here</div>
-          <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
-        `;
-      }, 3000);
-      
-      // Notify settings change if callback exists
-      if (onChange && typeof onChange === 'function') {
-        onChange();
-      }
-    } catch (error) {
-      console.error('Import failed:', error);
-      dropZone.innerHTML = `
-        <div style="color: #ff6b6b;">Failed to load: ${error.message || 'Unknown error'}</div>
-      `;
-      setTimeout(() => {
-        dropZone.innerHTML = `
-          <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
-          <div>Drop GLB file here</div>
-          <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
-        `;
-      }, 3000);
+      console.log(`[GUI] Added option for: ${result.modelName}`);
+    } else {
+      console.log(`[GUI] Option already exists for: ${result.modelName}`);
     }
+
+    // Refresh model pickers to show in checkbox lists
+    console.log(`[GUI] Refreshing model pickers...`);
+    await createModelPickers();
+    console.log(`[GUI] Model pickers refreshed`);
+
+    dropZone.innerHTML = `
+      <div style="color: #51cf66;">✓ ${file.name} imported! (${result.hasAnimations ? 'Animated' : 'Static'})</div>
+    `;
+    setTimeout(() => {
+      dropZone.innerHTML = `
+        <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
+        <div>Drop GLB file here</div>
+        <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
+      `;
+    }, 3000);
+
+    // Notify settings change if callback exists
+    if (onChange && typeof onChange === 'function') {
+      onChange();
+    }
+  } catch (error) {
+    console.error('[GUI] Import failed:', error);
+    dropZone.innerHTML = `
+      <div style="color: #ff6b6b;">Failed to import: ${error.message || 'Unknown error'}</div>
+    `;
+    setTimeout(() => {
+      dropZone.innerHTML = `
+        <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
+        <div>Drop GLB file here</div>
+        <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
+      `;
+    }, 3000);
   }
+}
 
   // Bloom folder
   const bloomFolder = createFolder('Bloom', container);
@@ -1011,24 +1025,43 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
     DISCOVERED_GLBS.animated,
     true, // has checkboxes
     async (modelName, isChecked) => {
+      console.log(`[GUI] Animated model ${modelName} checkbox changed: ${isChecked}`);
       if (isChecked) {
         // Load the model
         const modelInfo = DISCOVERED_GLBS.animated.find(m => m.name === modelName);
         if (modelInfo) {
           try {
-            // First unload any other animated models to keep only one active
-            for (const [name, data] of loadedAdditionalModels) {
-              if (data.hasAnimations && name !== modelName) {
-                removeAdditionalModel(name);
+            // Check if this is an imported model - if so, replace main model
+            if (modelInfo.isImported) {
+              console.log(`[GUI] Imported animated model checked - replacing main model: ${modelName}`);
+              // Uncheck all other models first
+              const allCheckboxes = document.querySelectorAll('#model-pickers-container input[type="checkbox"]');
+              allCheckboxes.forEach(cb => {
+                if (cb.checked && cb.dataset.modelName !== modelName) {
+                  cb.checked = false;
+                }
+              });
+              // Load as main model
+              await loadModel(modelInfo.path);
+              // Update the main dropdown selection
+              modelSelect.value = modelInfo.path;
+            } else {
+              // Regular model - unload other animated models and load as additional
+              console.log(`[GUI] Loading animated model: ${modelInfo.path}`);
+              for (const [name, data] of loadedAdditionalModels) {
+                if (data.hasAnimations && name !== modelName) {
+                  removeAdditionalModel(name);
+                }
               }
+              await loadAdditionalModel(modelInfo.path, true);
             }
-            await loadAdditionalModel(modelInfo.path, true);
           } catch (error) {
-            console.error('Failed to load animated model:', error);
+            console.error('[GUI] Failed to load animated model:', error);
           }
         }
       } else {
         // Unload the model completely when unchecked
+        console.log(`[GUI] Unloading animated model: ${modelName}`);
         removeAdditionalModel(modelName);
       }
     }
@@ -1067,8 +1100,25 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
         console.log(`[GUI] Looking for static model info:`, modelInfo);
         if (modelInfo) {
           try {
-            console.log(`[GUI] Loading static model: ${modelInfo.path}`);
-            await loadAdditionalModel(modelInfo.path, true);
+            // Check if this is an imported model - if so, replace main model
+            if (modelInfo.isImported) {
+              console.log(`[GUI] Imported static model checked - replacing main model: ${modelName}`);
+              // Uncheck all other models first
+              const allCheckboxes = document.querySelectorAll('#model-pickers-container input[type="checkbox"]');
+              allCheckboxes.forEach(cb => {
+                if (cb.checked && cb.dataset.modelName !== modelName) {
+                  cb.checked = false;
+                }
+              });
+              // Load as main model
+              await loadModel(modelInfo.path);
+              // Update the main dropdown selection
+              modelSelect.value = modelInfo.path;
+            } else {
+              // Regular model - load as additional
+              console.log(`[GUI] Loading static model: ${modelInfo.path}`);
+              await loadAdditionalModel(modelInfo.path, true);
+            }
           } catch (error) {
             console.error('[GUI] Failed to load static model:', error);
           }
@@ -1078,6 +1128,7 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
       } else {
         // Unload the model completely when unchecked
         console.log(`[GUI] Unloading static model: ${modelName}`);
+        // Only unload if it's loaded as additional model
         removeAdditionalModel(modelName);
       }
     }
@@ -1291,22 +1342,35 @@ function createModelDropdown(title, models, hasCheckboxes, onToggle) {
     if (hasCheckboxes) {
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
+      checkbox.dataset.modelName = model.name; // Store model name for reference
       checkbox.style.cssText = `
         cursor: pointer;
         width: 14px;
         height: 14px;
       `;
       // Check if model is loaded AND visible
+      // Imported/uploaded models should start unchecked (not loaded yet)
       const modelData = loadedAdditionalModels.get(model.name);
-      checkbox.checked = modelData ? modelData.visible : false;
+      const modelInfo = AVAILABLE_MODELS.find(m => m.name === model.name);
+      const isImported = model.isImported || modelInfo?.isImported;
       
+      // Default to unchecked for imported models, use visibility state for loaded models
+      if (isImported && !modelData) {
+        checkbox.checked = false; // Imported models start unchecked
+      } else {
+        checkbox.checked = modelData ? modelData.visible : false;
+      }
+      
+      // Debug logging
+      console.log(`[GUI] Checkbox for ${model.name}: checked=${checkbox.checked}, isImported=${isImported}, inLoadedMap=${!!modelData}`);
+
       checkbox.addEventListener('change', (e) => {
         e.stopPropagation();
         if (onToggle) {
           onToggle(model.name, checkbox.checked);
         }
       });
-      
+
       item.appendChild(checkbox);
     }
     

@@ -9,18 +9,20 @@
     "rebuild-spout": "cd node_modules/electron-spout && cmake-js compile",
     "electron-rebuild": "electron-rebuild -f -w electron-spout"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "devDependencies": {
     "cmake-js": "^8.0.0",
-    "electron": "^28.0.0",
+    "electron": "31.0.0",
     "electron-rebuild": "^3.2.9",
     "serve": "^14.2.5"
   },
   "dependencies": {
     "electron-spout": "github:cnSchwarzer/electron-spout",
     "three": "^0.179.0"
+  },
+  "overrides": {
+    "tar": "^7.5.9",
+    "cross-spawn": "^7.0.6",
+    "minimatch": "^9.0.5",
+    "ajv": "^8.17.1"
   }
 }

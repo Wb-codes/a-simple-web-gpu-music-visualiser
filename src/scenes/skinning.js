@@ -22,7 +22,7 @@ import {
   getDefaultAnimation,
   DYNAMIC_ANIMATION_NAMES
 } from '../core/animations.js';
-import { getUploadedGLBs } from '../utils/file-storage.js';
+import { getUploadedGLBs, saveUploadedGLB, getGLBBlobUrl } from '../utils/file-storage.js';
 
 /**
  * Available GLB models in the skinning folder
@@ -150,11 +150,30 @@ export async function scanSkinningFolder() {
       
       for (const uploaded of uploadedFromDB) {
         const uploadedName = uploaded.name.replace('.glb', '');
-        const exists = AVAILABLE_MODELS.some(m => m.name === uploadedName);
-        if (!exists) {
+        const indexedPath = `indexeddb://${uploaded.name}`;
+        
+        // Check if already in AVAILABLE_MODELS
+        const existsInAvailable = AVAILABLE_MODELS.some(m => m.name === uploadedName);
+        if (!existsInAvailable) {
+          // Add to AVAILABLE_MODELS with indexeddb:// path
+          AVAILABLE_MODELS.push({
+            name: uploadedName,
+            path: indexedPath,
+            isImported: true,
+            hasAnimations: false // Will be determined on load
+          });
+          console.log(`[Skinning] Restored from IndexedDB: ${uploadedName}`);
+        }
+        
+        // Check if already in DISCOVERED_GLBS
+        const existsInAnimated = DISCOVERED_GLBS.animated.some(m => m.name === uploadedName);
+        const existsInStatic = DISCOVERED_GLBS.static.some(m => m.name === uploadedName);
+        
+        if (!existsInAnimated && !existsInStatic) {
+          // We need to scan it to determine if it's animated
           fileList.push({
             file: uploaded.name,
-            path: uploaded.path || `uploaded/${uploaded.name}`
+            path: indexedPath
           });
         }
       }
@@ -163,26 +182,58 @@ export async function scanSkinningFolder() {
     console.warn('[Skinning] Failed to scan uploaded GLBs:', error);
   }
   
-  // Verify each file by loading it
+// Verify each file by loading it
   const loader = new GLTFLoader();
-  
+
   for (const { file, path } of fileList) {
     try {
       console.log(`[Skinning] Scanning ${file}...`);
+      
+      // Handle indexeddb:// paths specially
+      let loadPath = path;
+      let isTemporaryBlob = false;
+      
+      if (path.startsWith('indexeddb://')) {
+        const modelName = file.replace('.glb', '');
+        console.log(`[Skinning] Converting indexeddb:// path for scanning: ${modelName}`);
+        
+        try {
+          const glbData = await getUploadedGLB(file);
+          if (glbData && glbData.data) {
+            const blob = new Blob([glbData.data], { type: 'model/gltf-binary' });
+            loadPath = URL.createObjectURL(blob);
+            isTemporaryBlob = true;
+            console.log(`[Skinning] Created blob URL for scanning: ${modelName}`);
+          } else {
+            console.warn(`[Skinning] Model not found in IndexedDB: ${file}`);
+            continue;
+          }
+        } catch (dbError) {
+          console.warn(`[Skinning] Error reading from IndexedDB: ${dbError.message}`);
+          continue;
+        }
+      }
+      
       const gltf = await new Promise((resolve, reject) => {
-        loader.load(path, resolve, undefined, reject);
+        loader.load(loadPath, resolve, undefined, reject);
       });
       
+      // Clean up temporary blob URL
+      if (isTemporaryBlob) {
+        URL.revokeObjectURL(loadPath);
+        console.log(`[Skinning] Revoked temporary blob URL after scanning`);
+      }
+
       const hasAnimations = gltf.animations && gltf.animations.length > 0;
       const modelInfo = {
         name: file.replace('.glb', ''),
-        path: path,
+        path: path, // Keep original indexeddb:// path
         hasAnimations: hasAnimations,
         animationCount: hasAnimations ? gltf.animations.length : 0
       };
-      
+
       console.log(`[Skinning] Scanned ${file}: animations=${modelInfo.animationCount}`);
-      
+
       if (hasAnimations) {
         DISCOVERED_GLBS.animated.push(modelInfo);
       } else {
@@ -281,28 +332,24 @@ export async function reloadCurrentModel() {
 
 /**
  * Import a GLB file via drag and drop or file picker
- * Uses stored renderer, camera, and controls from scene state
- * Checks if GLB has animations and categorizes accordingly
+ * Saves file to IndexedDB and adds to model lists WITHOUT loading
+ * The model is only loaded when selected from the dropdown
+ * Supports up to 100MB of storage
  * @param {File} file - The GLB file to import
- * @returns {Promise<Object>} Object with scene, hasAnimations, animationCount
+ * @returns {Promise<Object>} Object with hasAnimations, animationCount, modelName, blobUrl
  */
 export async function importGLBFile(file) {
-  if (!skinningScene.renderer || !skinningScene.camera || !skinningScene.controls) {
-    console.error('Cannot import: scene not properly initialized');
-    throw new Error('Scene not initialized');
-  }
-  
-  const url = URL.createObjectURL(file);
   const modelName = file.name.replace('.glb', '');
   
+  console.log(`[Skinning] Importing GLB file: ${file.name}`);
+
   try {
-    const result = await loadModelFromURL(url, file.name, skinningScene.renderer, skinningScene.camera, skinningScene.controls);
-    
-    const hasAnimations = result.hasAnimations;
-    const animationCount = result.animationCount;
-    
-    // Add to DISCOVERED_GLBS based on animation status
-    // First remove any existing entry with the same name to avoid duplicates
+    // Step 1: Save file to IndexedDB for persistence
+    console.log(`[Skinning] Saving to IndexedDB...`);
+    const savedFile = await saveUploadedGLB(file);
+    console.log(`[Skinning] Saved to IndexedDB: ${savedFile.name}, blobUrl: ${savedFile.blobUrl}`);
+
+    // Step 2: Check if model already exists and remove to prevent duplicates
     const existingAnimatedIndex = DISCOVERED_GLBS.animated.findIndex(m => m.name === modelName);
     const existingStaticIndex = DISCOVERED_GLBS.static.findIndex(m => m.name === modelName);
     
@@ -314,57 +361,69 @@ export async function importGLBFile(file) {
       console.log(`[Skinning] Removing existing static model entry: ${modelName}`);
       DISCOVERED_GLBS.static.splice(existingStaticIndex, 1);
     }
+
+    // Step 3: Scan the file to check for animations (lightweight scan, no rendering)
+    let hasAnimations = false;
+    let animationCount = 0;
     
+    try {
+      // Quick scan without full scene initialization
+      const arrayBuffer = await file.arrayBuffer();
+      const gltfLoader = new GLTFLoader();
+      
+      await new Promise((resolve, reject) => {
+        gltfLoader.parse(arrayBuffer, '', (gltf) => {
+          hasAnimations = gltf.animations && gltf.animations.length > 0;
+          animationCount = hasAnimations ? gltf.animations.length : 0;
+          console.log(`[Skinning] Scanned ${file.name}: animations=${animationCount}`);
+          resolve();
+        }, (error) => {
+          console.warn(`[Skinning] Failed to scan ${file.name}:`, error);
+          reject(error);
+        });
+      });
+    } catch (error) {
+      console.warn(`[Skinning] Animation scan failed, defaulting to static: ${error.message}`);
+      hasAnimations = false;
+      animationCount = 0;
+    }
+
+    // Step 4: Create model info with special IndexedDB identifier
+    // Use "indexeddb://" prefix to indicate this model needs to be loaded from IndexedDB
     const modelInfo = {
       name: modelName,
-      path: url,
+      path: `indexeddb://${modelName}.glb`, // Special identifier for IndexedDB loading
       hasAnimations: hasAnimations,
       animationCount: animationCount,
-      isImported: true // Mark as uploaded to preserve across scans
+      isImported: true
     };
 
+    // Step 5: Add to appropriate DISCOVERED_GLBS list
     if (hasAnimations) {
       DISCOVERED_GLBS.animated.push(modelInfo);
-      console.log(`[Skinning] Uploaded animated model: ${modelName} (${animationCount} animations)`);
+      console.log(`[Skinning] Added animated model to list: ${modelName} (${animationCount} animations)`);
     } else {
       DISCOVERED_GLBS.static.push(modelInfo);
-      console.log(`[Skinning] Uploaded static model: ${modelName}`);
+      console.log(`[Skinning] Added static model to list: ${modelName}`);
     }
 
-    // Add to AVAILABLE_MODELS for main dropdown (check for duplicates first)
+    // Step 6: Add to AVAILABLE_MODELS for main dropdown
     const existingAvailableIndex = AVAILABLE_MODELS.findIndex(m => m.name === modelName);
     if (existingAvailableIndex !== -1) {
-      console.log(`[Skinning] Updating existing AVAILABLE_MODELS entry: ${modelName}`);
-      AVAILABLE_MODELS[existingAvailableIndex] = {
-        name: modelName,
-        path: url,
-        isImported: true,
-        hasAnimations: hasAnimations
-      };
+      console.log(`[Skinning] Updating AVAILABLE_MODELS entry: ${modelName}`);
+      AVAILABLE_MODELS[existingAvailableIndex] = modelInfo;
     } else {
-      AVAILABLE_MODELS.push({
-        name: modelName,
-        path: url,
-        isImported: true,
-        hasAnimations: hasAnimations
-      });
+      AVAILABLE_MODELS.push(modelInfo);
+      console.log(`[Skinning] Added to AVAILABLE_MODELS: ${modelName}`);
     }
-    
-    // IMPORTANT: Do NOT keep model loaded - remove from scene
-    // Uploaded models should only be scanned, not auto-loaded
-    if (loadedAdditionalModels.has(modelName)) {
-      console.log(`[Skinning] Removing uploaded model from loaded list: ${modelName}`);
-      loadedAdditionalModels.delete(modelName);
-    }
-    if (skinningScene.scene && result.scene) {
-      console.log(`[Skinning] Removing uploaded model from scene: ${modelName}`);
-      skinningScene.scene.remove(result.scene);
-    }
-    
-    return { scene: null, hasAnimations, animationCount, modelName };
-  } finally {
-    // Don't revoke URL immediately - keep it for the session
-    // URL.revokeObjectURL(url);
+
+    // IMPORTANT: Model is NOT loaded into scene - it will be loaded when selected
+    console.log(`[Skinning] Import complete: ${modelName} ready for selection`);
+
+    return { hasAnimations, animationCount, modelName, path: `indexeddb://${modelName}.glb` };
+  } catch (error) {
+    console.error(`[Skinning] Import failed for ${file.name}:`, error);
+    throw error;
   }
 }
 
@@ -380,6 +439,102 @@ export async function loadModel(modelPath) {
     throw new Error('Scene not initialized');
   }
   return loadModelWithParams(modelPath, skinningScene.renderer, skinningScene.camera, skinningScene.controls);
+}
+
+/**
+ * Load a specific GLB model with proper cleanup of previous model
+ * Replaces the current model in the scene
+ * @param {string} modelPath - Path to the GLB file
+ * @param {THREE.WebGPURenderer} renderer - The WebGPU renderer
+ * @param {THREE.PerspectiveCamera} camera - Main camera
+ * @param {OrbitControls} controls - Camera controls
+ * @returns {Promise<THREE.Scene>}
+ */
+async function loadModelWithParams(modelPath, renderer, camera, controls) {
+  console.log(`[Skinning] Loading model with params: ${modelPath}`);
+  
+  // Clear previous model data and scene
+  clearDynamicAnimations();
+  
+  if (skinningScene.scene) {
+    // Remove old point clouds
+    if (skinningScene.pointClouds) {
+      skinningScene.pointClouds.forEach(cloud => {
+        skinningScene.scene.remove(cloud);
+        // Dispose geometry and material to free memory
+        cloud.geometry?.dispose();
+        cloud.material?.dispose();
+      });
+      skinningScene.pointClouds = [];
+    }
+    
+    // Remove old model
+    if (skinningScene.model) {
+      skinningScene.scene.remove(skinningScene.model);
+      // Dispose meshes
+      skinningScene.model.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m?.dispose());
+          } else {
+            child.material?.dispose();
+          }
+        }
+      });
+    }
+  }
+  
+  // Stop previous mixer
+  if (skinningScene.mixer) {
+    skinningScene.mixer.stopAllAction();
+    skinningScene.mixer = null;
+  }
+  
+  skinningScene.loaded = false;
+  skinningScene.currentModelPath = modelPath;
+  currentModelPath = modelPath;
+  
+  // Get the model name from path
+  const modelName = modelPath.split('/').pop().replace('.glb', '');
+  
+  // Check if this is an imported model that needs to be retrieved from IndexedDB
+  let url = modelPath;
+  let isTemporaryBlob = false;
+  
+  if (modelPath.startsWith('indexeddb://')) {
+    console.log(`[Skinning] Loading from IndexedDB: ${modelName}`);
+    try {
+      const glbData = await getUploadedGLB(modelName + '.glb');
+      if (glbData && glbData.data) {
+        // Create fresh blob URL from stored data
+        const blob = new Blob([glbData.data], { type: 'model/gltf-binary' });
+        url = URL.createObjectURL(blob);
+        isTemporaryBlob = true;
+        console.log(`[Skinning] Created fresh blob URL from IndexedDB data: ${modelName}`);
+      } else {
+        console.error(`[Skinning] Model not found in IndexedDB: ${modelName}`);
+        throw new Error(`Model ${modelName} not found in storage`);
+      }
+    } catch (error) {
+      console.error(`[Skinning] Error loading from IndexedDB: ${error.message}`);
+      throw error;
+    }
+  } else if (modelPath.startsWith('blob:')) {
+    console.log(`[Skinning] Using provided blob URL: ${modelName}`);
+    url = modelPath;
+  }
+  
+  try {
+    const result = await loadModelFromURL(url, modelName, renderer, camera, controls);
+    return result.scene;
+  } finally {
+    // Clean up temporary blob URL if we created one
+    if (url !== modelPath && url.startsWith('blob:')) {
+      URL.revokeObjectURL(url);
+      console.log(`[Skinning] Revoked temporary blob URL for: ${modelName}`);
+    }
+  }
 }
 
 /**
@@ -769,7 +924,7 @@ export function getAvailableAnimations() {
  */
 export async function loadAdditionalModel(modelPath, visible = false) {
   console.log(`[Skinning] loadAdditionalModel called: ${modelPath}, visible=${visible}`);
-  
+
   if (!skinningScene.renderer || !skinningScene.camera || !skinningScene.controls) {
     console.error('[Skinning] Cannot load additional model: scene not initialized');
     throw new Error('Scene not initialized');
@@ -783,14 +938,41 @@ export async function loadAdditionalModel(modelPath, visible = false) {
     console.log(`[Skinning] Model ${modelName} already loaded`);
     return loadedAdditionalModels.get(modelName);
   }
+
+  // Check if this is an imported model that needs to be retrieved from IndexedDB
+  let url = modelPath;
+  let isTemporaryBlob = false;
   
-  console.log(`[Skinning] Loading additional model: ${modelName} from ${modelPath}`);
-  
+  if (modelPath.startsWith('indexeddb://')) {
+    console.log(`[Skinning] Loading additional model from IndexedDB: ${modelName}`);
+    try {
+      const glbData = await getUploadedGLB(modelName + '.glb');
+      if (glbData && glbData.data) {
+        // Create fresh blob URL from stored data
+        const blob = new Blob([glbData.data], { type: 'model/gltf-binary' });
+        url = URL.createObjectURL(blob);
+        isTemporaryBlob = true;
+        console.log(`[Skinning] Created fresh blob URL from IndexedDB data: ${modelName}`);
+      } else {
+        console.error(`[Skinning] Model not found in IndexedDB: ${modelName}`);
+        throw new Error(`Model ${modelName} not found in storage`);
+      }
+    } catch (error) {
+      console.error(`[Skinning] Error loading from IndexedDB: ${error.message}`);
+      throw error;
+    }
+  } else if (modelPath.startsWith('blob:')) {
+    console.log(`[Skinning] Using provided blob URL: ${modelName}`);
+    url = modelPath;
+  }
+
+  console.log(`[Skinning] Loading additional model: ${modelName} from ${url}`);
+
   const loader = new GLTFLoader();
-  
+
   return new Promise((resolve, reject) => {
     loader.load(
-      modelPath,
+      url,
       (gltf) => {
         const object = gltf.scene;
         const hasAnimations = gltf.animations && gltf.animations.length > 0;
@@ -845,19 +1027,25 @@ export async function loadAdditionalModel(modelPath, visible = false) {
         pointClouds: createdPointClouds
       };
 
-      loadedAdditionalModels.set(modelName, modelData);
-      console.log(`[Skinning] Successfully loaded: ${modelName} (animations: ${hasAnimations}, pointClouds: ${createdPointClouds.length})`);
+        loadedAdditionalModels.set(modelName, modelData);
+        console.log(`[Skinning] Successfully loaded: ${modelName} (animations: ${hasAnimations}, pointClouds: ${createdPointClouds.length})`);
 
-      // Notify UI about animations if this is an animated model
-      if (hasAnimations && gltf.animations.length > 0) {
-        console.log(`[Skinning] Notifying UI about ${gltf.animations.length} animations for ${modelName}`);
-        const animData = buildAnimationMapFromGLB(gltf.animations, modelPath);
-        if (onAnimationsLoadedCallback) {
-          onAnimationsLoadedCallback(animData.names, animData.defaultAnimation);
+        // Notify UI about animations if this is an animated model
+        if (hasAnimations && gltf.animations.length > 0) {
+          console.log(`[Skinning] Notifying UI about ${gltf.animations.length} animations for ${modelName}`);
+          const animData = buildAnimationMapFromGLB(gltf.animations, modelPath);
+          if (onAnimationsLoadedCallback) {
+            onAnimationsLoadedCallback(animData.names, animData.defaultAnimation);
+          }
         }
-      }
 
-      resolve(modelData);
+        // Clean up temporary blob URL if we created one
+        if (isTemporaryBlob) {
+          URL.revokeObjectURL(url);
+          console.log(`[Skinning] Revoked temporary blob URL for: ${modelName}`);
+        }
+
+        resolve(modelData);
       },
       undefined,
       (error) => {
