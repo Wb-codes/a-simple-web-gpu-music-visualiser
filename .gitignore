@@ -18,3 +18,8 @@ docker-compose.yml
 docker-compose.yaml
 .dockerignore
 docker/
+
+# Development/Generated files
+CHANGES_SUMMARY.txt
+Dockerfile.opencode
+musicvis.app
