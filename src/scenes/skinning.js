@@ -22,6 +22,7 @@ import {
   getDefaultAnimation,
   DYNAMIC_ANIMATION_NAMES
 } from '../core/animations.js';
+import { getUploadedGLBs } from '../utils/file-storage.js';
 
 /**
  * Available GLB models in the skinning folder
@@ -50,6 +51,35 @@ export const DISCOVERED_GLBS = {
 export const loadedAdditionalModels = new Map();
 
 /**
+ * Name of the currently visible animated model (for checkbox state)
+ * @type {string|null}
+ */
+export let currentAnimatedModel = null;
+
+/**
+ * Set the currently visible animated model
+ * @param {string} modelName - Name of the visible animated model
+ */
+export function setCurrentAnimatedModel(modelName) {
+  currentAnimatedModel = modelName;
+}
+
+/**
+ * Get the currently visible animated model
+ * @returns {string|null}
+ */
+export function getCurrentAnimatedModel() {
+  return currentAnimatedModel;
+}
+
+/**
+ * Clear current animated model (when none visible)
+ */
+export function clearCurrentAnimatedModel() {
+  currentAnimatedModel = null;
+}
+
+/**
  * Scan the skinning folder for GLB files
  * Uses a manifest file (index.json) if available, falls back to hardcoded list
  * Loads each GLB to verify animations and categorize accordingly
@@ -59,9 +89,13 @@ export async function scanSkinningFolder() {
   const skinningPath = 'models/gltf/skinning/';
   let fileList = [];
   
-  // Reset discovered lists
-  DISCOVERED_GLBS.animated = [];
-  DISCOVERED_GLBS.static = [];
+  // Save uploaded models to preserve them
+  const uploadedAnimated = DISCOVERED_GLBS.animated.filter(m => m.isImported);
+  const uploadedStatic = DISCOVERED_GLBS.static.filter(m => m.isImported);
+  
+  // Reset discovered lists (keeping uploaded models)
+  DISCOVERED_GLBS.animated = [...uploadedAnimated];
+  DISCOVERED_GLBS.static = [...uploadedStatic];
   
   // Try to load manifest file first (backward compatible)
   try {
@@ -86,11 +120,48 @@ export async function scanSkinningFolder() {
     ];
   }
   
-  // Update AVAILABLE_MODELS to match discovered files for GUI dropdown
-  AVAILABLE_MODELS.length = 0;
-  fileList.forEach(({ file, path }) => {
-    AVAILABLE_MODELS.push({ name: file.replace('.glb', ''), path: path });
+  // Update AVAILABLE_MODELS to match discovered files (do NOT clear, only add missing)
+  // First, add uploaded models (preserve them)
+  const uploadedModels = AVAILABLE_MODELS.filter(m => m.isImported);
+  uploadedModels.forEach(m => {
+    // Check if model with this path already exists (avoid duplicates)
+    const exists = AVAILABLE_MODELS.some(existing => existing.path === m.path);
+    if (!exists) AVAILABLE_MODELS.push(m);
   });
+  
+  // Add manifest models (only if not already in list by path OR name)
+  fileList.forEach(({ file, path }) => {
+    const name = file.replace('.glb', '');
+    // Check if model with same name OR same path already exists
+    // This prevents duplicates from manifest vs uploaded with same name
+    const alreadyExists = AVAILABLE_MODELS.some(m => 
+      m.path === path || m.name === name
+    );
+    if (!alreadyExists) {
+      AVAILABLE_MODELS.push({ name, path });
+    }
+  });
+
+  // Also scan uploaded GLBs from IndexedDB (virtual storage)
+  try {
+    const uploadedFromDB = await getUploadedGLBs();
+    if (uploadedFromDB && uploadedFromDB.length > 0) {
+      console.log(`[Skinning] Found ${uploadedFromDB.length} uploaded GLBs in virtual storage`);
+      
+      for (const uploaded of uploadedFromDB) {
+        const uploadedName = uploaded.name.replace('.glb', '');
+        const exists = AVAILABLE_MODELS.some(m => m.name === uploadedName);
+        if (!exists) {
+          fileList.push({
+            file: uploaded.name,
+            path: uploaded.path || `uploaded/${uploaded.name}`
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[Skinning] Failed to scan uploaded GLBs:', error);
+  }
   
   // Verify each file by loading it
   const loader = new GLTFLoader();
@@ -122,12 +193,12 @@ export async function scanSkinningFolder() {
     }
   }
   
-  console.log('[Skinning] Scan complete:', {
-    animated: DISCOVERED_GLBS.animated.length,
-    static: DISCOVERED_GLBS.static.length
-  });
-  
-  return DISCOVERED_GLBS;
+console.log('[Skinning] Scan complete:', {
+  animated: DISCOVERED_GLBS.animated.length,
+  static: DISCOVERED_GLBS.static.length
+});
+
+return DISCOVERED_GLBS;
 }
 
 /**
@@ -211,8 +282,9 @@ export async function reloadCurrentModel() {
 /**
  * Import a GLB file via drag and drop or file picker
  * Uses stored renderer, camera, and controls from scene state
+ * Checks if GLB has animations and categorizes accordingly
  * @param {File} file - The GLB file to import
- * @returns {Promise<THREE.Scene>}
+ * @returns {Promise<Object>} Object with scene, hasAnimations, animationCount
  */
 export async function importGLBFile(file) {
   if (!skinningScene.renderer || !skinningScene.camera || !skinningScene.controls) {
@@ -224,16 +296,72 @@ export async function importGLBFile(file) {
   const modelName = file.name.replace('.glb', '');
   
   try {
-    const scene = await loadModelFromURL(url, file.name, skinningScene.renderer, skinningScene.camera, skinningScene.controls);
+    const result = await loadModelFromURL(url, file.name, skinningScene.renderer, skinningScene.camera, skinningScene.controls);
     
-    // Add to available models (session only)
-    AVAILABLE_MODELS.push({
+    const hasAnimations = result.hasAnimations;
+    const animationCount = result.animationCount;
+    
+    // Add to DISCOVERED_GLBS based on animation status
+    // First remove any existing entry with the same name to avoid duplicates
+    const existingAnimatedIndex = DISCOVERED_GLBS.animated.findIndex(m => m.name === modelName);
+    const existingStaticIndex = DISCOVERED_GLBS.static.findIndex(m => m.name === modelName);
+    
+    if (existingAnimatedIndex !== -1) {
+      console.log(`[Skinning] Removing existing animated model entry: ${modelName}`);
+      DISCOVERED_GLBS.animated.splice(existingAnimatedIndex, 1);
+    }
+    if (existingStaticIndex !== -1) {
+      console.log(`[Skinning] Removing existing static model entry: ${modelName}`);
+      DISCOVERED_GLBS.static.splice(existingStaticIndex, 1);
+    }
+    
+    const modelInfo = {
       name: modelName,
       path: url,
-      isImported: true
-    });
+      hasAnimations: hasAnimations,
+      animationCount: animationCount,
+      isImported: true // Mark as uploaded to preserve across scans
+    };
+
+    if (hasAnimations) {
+      DISCOVERED_GLBS.animated.push(modelInfo);
+      console.log(`[Skinning] Uploaded animated model: ${modelName} (${animationCount} animations)`);
+    } else {
+      DISCOVERED_GLBS.static.push(modelInfo);
+      console.log(`[Skinning] Uploaded static model: ${modelName}`);
+    }
+
+    // Add to AVAILABLE_MODELS for main dropdown (check for duplicates first)
+    const existingAvailableIndex = AVAILABLE_MODELS.findIndex(m => m.name === modelName);
+    if (existingAvailableIndex !== -1) {
+      console.log(`[Skinning] Updating existing AVAILABLE_MODELS entry: ${modelName}`);
+      AVAILABLE_MODELS[existingAvailableIndex] = {
+        name: modelName,
+        path: url,
+        isImported: true,
+        hasAnimations: hasAnimations
+      };
+    } else {
+      AVAILABLE_MODELS.push({
+        name: modelName,
+        path: url,
+        isImported: true,
+        hasAnimations: hasAnimations
+      });
+    }
     
-    return scene;
+    // IMPORTANT: Do NOT keep model loaded - remove from scene
+    // Uploaded models should only be scanned, not auto-loaded
+    if (loadedAdditionalModels.has(modelName)) {
+      console.log(`[Skinning] Removing uploaded model from loaded list: ${modelName}`);
+      loadedAdditionalModels.delete(modelName);
+    }
+    if (skinningScene.scene && result.scene) {
+      console.log(`[Skinning] Removing uploaded model from scene: ${modelName}`);
+      skinningScene.scene.remove(result.scene);
+    }
+    
+    return { scene: null, hasAnimations, animationCount, modelName };
   } finally {
     // Don't revoke URL immediately - keep it for the session
     // URL.revokeObjectURL(url);
@@ -260,40 +388,7 @@ export async function loadModel(modelPath) {
  * @param {THREE.WebGPURenderer} renderer - The WebGPU renderer
  * @param {THREE.PerspectiveCamera} camera - Main camera
  * @param {OrbitControls} controls - Camera controls
- * @returns {Promise<THREE.Scene>}
- */
-async function loadModelWithParams(modelPath, renderer, camera, controls) {
-  // Clear previous model data
-  clearDynamicAnimations();
-  
-  if (skinningScene.scene) {
-    // Remove old point clouds
-    skinningScene.pointClouds.forEach(cloud => {
-      skinningScene.scene.remove(cloud);
-    });
-    skinningScene.pointClouds = [];
-    
-    // Remove old model
-    if (skinningScene.model) {
-      skinningScene.scene.remove(skinningScene.model);
-    }
-  }
-  
-  skinningScene.loaded = false;
-  skinningScene.currentModelPath = modelPath;
-  currentModelPath = modelPath;
-  
-  return loadModelFromURL(modelPath, 'model', renderer, camera, controls);
-}
-
-/**
- * Load model from URL
- * @param {string} url - URL to the GLB
- * @param {string} filename - Original filename
- * @param {THREE.WebGPURenderer} renderer - The WebGPU renderer
- * @param {THREE.PerspectiveCamera} camera - Main camera
- * @param {OrbitControls} controls - Camera controls
- * @returns {Promise<THREE.Scene>}
+ * @returns {Promise<{scene: THREE.Scene, hasAnimations: boolean, animationCount: number}>}
  */
 async function loadModelFromURL(url, filename, renderer, camera, controls) {
   const scene = skinningScene.scene || new THREE.Scene();
@@ -371,7 +466,11 @@ async function loadModelFromURL(url, filename, renderer, camera, controls) {
         setupCameraForModel(object, camera, controls);
         
         console.log('Skinning scene initialized for:', filename);
-        resolve(scene);
+        resolve({
+          scene,
+          hasAnimations: gltf.animations && gltf.animations.length > 0,
+          animationCount: gltf.animations ? gltf.animations.length : 0
+        });
       },
       (progress) => {
         const percent = (progress.loaded / progress.total) * 100;
@@ -527,7 +626,8 @@ export async function initSkinningScene(renderer, camera, controls) {
     return skinningScene.scene;
   }
   
-  return loadModelFromURL(currentModelPath, 'model', renderer, camera, controls);
+  const result = await loadModelFromURL(currentModelPath, 'model', renderer, camera, controls);
+  return result.scene;
 }
 
 /**
@@ -814,34 +914,70 @@ export function toggleModelVisibility(modelName, visible) {
 
 /**
  * Remove an additional model from the scene
+ * Also removes from DISCOVERED_GLBS and AVAILABLE_MODELS if it's an imported model
  * @param {string} modelName - Name of the model to remove
  */
 export function removeAdditionalModel(modelName) {
   console.log(`[Skinning] Removing model: ${modelName}`);
   const modelData = loadedAdditionalModels.get(modelName);
-  if (!modelData) {
-    console.warn(`[Skinning] Model ${modelName} not found for removal`);
-    return false;
+  let removedFromScene = false;
+  
+  if (modelData) {
+    // Remove from scene
+    if (skinningScene.scene) {
+      skinningScene.scene.remove(modelData.model);
+    }
+    console.log(`[Skinning] Removed model object from scene`);
+
+    // Remove point clouds
+    if (modelData.pointClouds) {
+      console.log(`[Skinning] Removing ${modelData.pointClouds.length} point clouds`);
+      modelData.pointClouds.forEach(cloud => {
+        if (skinningScene.scene) {
+          skinningScene.scene.remove(cloud);
+        }
+      });
+    }
+
+    // Clean up from modelPointClouds tracking
+    modelPointClouds.delete(modelName);
+    loadedAdditionalModels.delete(modelName);
+    removedFromScene = true;
   }
-
-  // Remove from scene
-  skinningScene.scene.remove(modelData.model);
-  console.log(`[Skinning] Removed model object from scene`);
-
-  // Remove point clouds
-  if (modelData.pointClouds) {
-    console.log(`[Skinning] Removing ${modelData.pointClouds.length} point clouds`);
-    modelData.pointClouds.forEach(cloud => {
-      skinningScene.scene.remove(cloud);
-    });
+  
+  // Check if this is an imported model in DISCOVERED_GLBS and remove it
+  // This handles the case where imported models were never added to loadedAdditionalModels
+  let removedFromDiscovered = false;
+  
+  const animatedIndex = DISCOVERED_GLBS.animated.findIndex(m => m.name === modelName && m.isImported);
+  if (animatedIndex !== -1) {
+    console.log(`[Skinning] Removing imported animated model from DISCOVERED_GLBS: ${modelName}`);
+    DISCOVERED_GLBS.animated.splice(animatedIndex, 1);
+    removedFromDiscovered = true;
   }
-
-  // Clean up from modelPointClouds tracking
-  modelPointClouds.delete(modelName);
-
-  loadedAdditionalModels.delete(modelName);
-  console.log(`[Skinning] Successfully removed model: ${modelName}`);
-  return true;
+  
+  const staticIndex = DISCOVERED_GLBS.static.findIndex(m => m.name === modelName && m.isImported);
+  if (staticIndex !== -1) {
+    console.log(`[Skinning] Removing imported static model from DISCOVERED_GLBS: ${modelName}`);
+    DISCOVERED_GLBS.static.splice(staticIndex, 1);
+    removedFromDiscovered = true;
+  }
+  
+  // Also remove from AVAILABLE_MODELS if it's an imported model
+  const availableIndex = AVAILABLE_MODELS.findIndex(m => m.name === modelName && m.isImported);
+  if (availableIndex !== -1) {
+    console.log(`[Skinning] Removing imported model from AVAILABLE_MODELS: ${modelName}`);
+    AVAILABLE_MODELS.splice(availableIndex, 1);
+    removedFromDiscovered = true;
+  }
+  
+  if (removedFromScene || removedFromDiscovered) {
+    console.log(`[Skinning] Successfully removed model: ${modelName}`);
+    return true;
+  }
+  
+  console.warn(`[Skinning] Model ${modelName} not found for removal`);
+  return false;
 }
 
 /**
@@ -883,3 +1019,99 @@ export function updateSkinningScene(delta, settings, renderer) {
   const darkColor = new THREE.Color(0x111111);
   skinningScene.backgroundColor.copy(settings.greenScreen.value ? greenColor : darkColor);
 }
+
+/**
+ * Cleanup skinning scene and dispose all resources
+ */
+export function cleanupSkinningScene() {
+  if (!skinningScene.scene) return;
+
+  console.log('[Skinning] Cleaning up scene...');
+
+  // Stop and dispose main mixer
+  if (skinningScene.mixer) {
+    skinningScene.mixer.stopAllAction();
+    skinningScene.mixer = null;
+  }
+
+  // Remove and dispose all loaded additional models
+  loadedAdditionalModels.forEach((modelData, name) => {
+    console.log(`[Skinning] Disposing model: ${name}`);
+    
+    // Stop mixer for this model
+    if (modelData.mixer) {
+      modelData.mixer.stopAllAction();
+    }
+
+    // Remove from scene
+    if (skinningScene.scene && modelData.model) {
+      skinningScene.scene.remove(modelData.model);
+      
+      // Dispose all meshes
+      modelData.model.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach(m => m?.dispose());
+          } else {
+            child.material?.dispose();
+          }
+        }
+      });
+    }
+
+    // Dispose point clouds
+    if (modelData.pointClouds) {
+      modelData.pointClouds.forEach(cloud => {
+        if (skinningScene.scene) {
+          skinningScene.scene.remove(cloud);
+        }
+        cloud.geometry?.dispose();
+        cloud.material?.dispose();
+      });
+    }
+  });
+
+  // Clear all maps
+  loadedAdditionalModels.clear();
+  modelPointClouds.clear();
+
+  // Dispose main model
+  if (skinningScene.model) {
+    skinningScene.model.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry?.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach(m => m?.dispose());
+        } else {
+          child.material?.dispose();
+        }
+      }
+    });
+    skinningScene.model = null;
+  }
+
+  // Dispose main point clouds
+  if (skinningScene.pointClouds) {
+    skinningScene.pointClouds.forEach(cloud => {
+      if (skinningScene.scene) {
+        skinningScene.scene.remove(cloud);
+      }
+      cloud.geometry?.dispose();
+      cloud.material?.dispose();
+    });
+    skinningScene.pointClouds = [];
+  }
+
+  // Clear scene reference
+  skinningScene.scene = null;
+  skinningScene.animations = null;
+  skinningScene.currentAction = null;
+  skinningScene.currentAnimationName = '';
+  skinningScene.loaded = false;
+
+  // Don't clear the DISCOVERED_GLBS or AVAILABLE_MODELS - those should persist across scene switches
+
+  console.log('[Skinning] Cleanup complete');
+}
+  

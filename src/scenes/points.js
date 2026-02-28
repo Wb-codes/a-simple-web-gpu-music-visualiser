@@ -359,3 +359,45 @@ export function updatePointsScene(delta, settings, renderer, audioData) {
       : null;
   }
 }
+
+/**
+ * Cleanup points scene and dispose resources
+ */
+export function cleanupPointsScene() {
+  if (!pointsScene.scene) return;
+
+  console.log('[Points] Cleaning up scene...');
+
+  // Dispose curve systems
+  pointsScene.curveSystems.forEach(system => {
+    if (system.mesh) {
+      system.mesh.geometry?.dispose();
+      system.mesh.material?.dispose();
+    }
+  });
+  pointsScene.curveSystems = [];
+
+  // Dispose background mesh
+  if (pointsScene.backgroundMesh) {
+    pointsScene.backgroundMesh.geometry?.dispose();
+    pointsScene.backgroundMesh.material?.dispose();
+    pointsScene.backgroundMesh = null;
+  }
+
+  // Dispose light
+  if (pointsScene.light) {
+    pointsScene.light.dispose();
+    pointsScene.light = null;
+  }
+
+  // Clear audio tracker
+  if (pointsScene.audioTracker) {
+    pointsScene.audioTracker.clear?.();
+  }
+
+  // Clear scene reference
+  pointsScene.scene = null;
+  pointsScene.currentRotation = 0;
+
+  console.log('[Points] Cleanup complete');
+}

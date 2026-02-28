@@ -775,12 +775,12 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
     reloadBtn.textContent = 'Loading...';
     reloadBtn.disabled = true;
     try {
-      // Get current app context (renderer, camera, controls)
-      // This will be handled by the scene reload
-      await reloadCurrentModel();
+      const result = await reloadCurrentModel();
+      console.log('[GUI] Reload successful:', result);
       reloadBtn.textContent = '↻ Reload Model';
     } catch (error) {
-      reloadBtn.textContent = 'Error! Retry';
+      console.error('[GUI] Reload failed:', error);
+      reloadBtn.textContent = `Error! ${error.message || 'Unknown'}`;
     }
     reloadBtn.disabled = false;
   };
@@ -882,17 +882,20 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
   async function handleGLBImport(file) {
     dropZone.innerHTML = `<div style="color: #667eea;">Loading ${file.name}...</div>`;
     try {
-      await importGLBFile(file);
+      const result = await importGLBFile(file);
       
       // Add to model dropdown
       const option = document.createElement('option');
-      option.value = file.name;
-      option.textContent = file.name.replace('.glb', '');
+      option.value = result.modelName;
+      option.textContent = result.modelName;
       modelSelect.appendChild(option);
       option.selected = true;
       
+      // NEW: Refresh model pickers to show in checkbox lists
+      await createModelPickers();
+      
       dropZone.innerHTML = `
-        <div style="color: #51cf66;">✓ ${file.name} loaded!</div>
+        <div style="color: #51cf66;">✓ ${file.name} loaded! (${result.hasAnimations ? 'Animated' : 'Static'})</div>
       `;
       setTimeout(() => {
         dropZone.innerHTML = `
@@ -902,11 +905,14 @@ export function createSkinningGUI(settings, container, onChange, isElectron) {
         `;
       }, 3000);
       
-      if (onChange) onChange();
+      // Notify settings change if callback exists
+      if (onChange && typeof onChange === 'function') {
+        onChange();
+      }
     } catch (error) {
       console.error('Import failed:', error);
       dropZone.innerHTML = `
-        <div style="color: #ff6b6b;">Failed to load</div>
+        <div style="color: #ff6b6b;">Failed to load: ${error.message || 'Unknown error'}</div>
       `;
       setTimeout(() => {
         dropZone.innerHTML = `

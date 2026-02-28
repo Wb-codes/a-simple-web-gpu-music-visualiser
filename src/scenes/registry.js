@@ -5,31 +5,41 @@
 
 import * as THREE from 'three/webgpu';
 
-import { initParticlesScene, updateParticlesScene } from './particles.js';
-import { initPointsScene, updatePointsScene } from './points.js';
-import { initSkinningScene, updateSkinningScene } from './skinning.js';
+import { initParticlesScene, updateParticlesScene, cleanupParticlesScene } from './particles.js';
+import { initPointsScene, updatePointsScene, cleanupPointsScene } from './points.js';
+import { initSkinningScene, updateSkinningScene, cleanupSkinningScene } from './skinning.js';
 import { SCENE_NAMES } from '../core/constants.js';
+import { disposeScene } from '../utils/disposal.js';
 
 /** @typedef {'particles' | 'points' | 'skinning'} SceneType */
 
-/** @type {Object.<SceneType, {init: Function, update: Function}>} */
+/** @type {Object.<SceneType, {init: Function, update: Function, cleanup: Function}>} */
 const sceneRegistry = {
-    particles: {
-        init: initParticlesScene,
-        update: updateParticlesScene
-    },
-    points: {
-        init: initPointsScene,
-        update: updatePointsScene
-    },
-    skinning: {
-        init: initSkinningScene,
-        update: updateSkinningScene
-    }
+  particles: {
+    init: initParticlesScene,
+    update: updateParticlesScene,
+    cleanup: cleanupParticlesScene
+  },
+  points: {
+    init: initPointsScene,
+    update: updatePointsScene,
+    cleanup: cleanupPointsScene
+  },
+  skinning: {
+    init: initSkinningScene,
+    update: updateSkinningScene,
+    cleanup: cleanupSkinningScene
+  }
 };
 
 /** @type {SceneType|null} */
 let currentSceneType = null;
+
+/** @type {THREE.Scene|null} */
+let currentScene = null;
+
+/** @type {Function|null} */
+let currentSceneCleanup = null;
 
 /**
  * Get the current scene type.
@@ -48,12 +58,30 @@ export function getCurrentSceneType() {
  * @returns {Promise<THREE.Scene>}
  */
 export async function initScene(sceneType, renderer, camera, controls) {
-    const sceneConfig = sceneRegistry[sceneType];
-    if (!sceneConfig) {
-        throw new Error(`Unknown scene type: ${sceneType}`);
+  const sceneConfig = sceneRegistry[sceneType];
+  if (!sceneConfig) {
+    throw new Error(`Unknown scene type: ${sceneType}`);
+  }
+
+  // Cleanup previous scene before switching
+  if (currentScene && currentSceneCleanup) {
+    console.log(`[Registry] Cleaning up previous scene: ${currentSceneType}`);
+    try {
+      currentSceneCleanup();
+      disposeScene(currentScene);
+    } catch (err) {
+      console.error('[Registry] Error cleaning up scene:', err);
     }
-    currentSceneType = sceneType;
-    return sceneConfig.init(renderer, camera, controls);
+    currentScene = null;
+    currentSceneCleanup = null;
+  }
+
+  currentSceneType = sceneType;
+  const scene = await sceneConfig.init(renderer, camera, controls);
+  currentScene = scene;
+  currentSceneCleanup = sceneConfig.cleanup;
+  
+  return scene;
 }
 
 /**

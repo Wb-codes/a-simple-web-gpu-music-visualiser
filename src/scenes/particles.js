@@ -337,14 +337,47 @@ export function updateParticlesScene(delta, settings, renderer) {
         Math.sin(particlesScene.elapsedTime * 0.2) * 30
     );
 
-    // Green screen toggle - hide icosahedron and use flat green background
-    const greenScreenEnabled = settings.greenScreen?.value === true;
-    if (particlesScene.backgroundMesh) {
-        particlesScene.backgroundMesh.visible = !greenScreenEnabled;
-    }
-    if (particlesScene.scene) {
-        particlesScene.scene.background = greenScreenEnabled 
-            ? new THREE.Color(0x007900) 
-            : null;
-    }
+  // Green screen toggle - hide icosahedron and use flat green background
+  const greenScreenEnabled = settings.greenScreen?.value === true;
+  if (particlesScene.backgroundMesh) {
+    particlesScene.backgroundMesh.visible = !greenScreenEnabled;
+  }
+  if (particlesScene.scene) {
+    particlesScene.scene.background = greenScreenEnabled
+      ? new THREE.Color(0x007900)
+      : null;
+  }
+}
+
+/**
+ * Cleanup particles scene and dispose resources
+ */
+export function cleanupParticlesScene() {
+  if (!particlesScene.scene) return;
+
+  console.log('[Particles] Cleaning up scene...');
+
+  // Stop compute operations
+  particlesScene.updateParticles = null;
+  particlesScene.spawnParticles = null;
+
+  // Dispose mesh geometries and materials
+  if (particlesScene.backgroundMesh) {
+    particlesScene.backgroundMesh.geometry?.dispose();
+    particlesScene.backgroundMesh.material?.dispose();
+    particlesScene.backgroundMesh = null;
+  }
+
+  // Dispose light
+  if (particlesScene.light) {
+    particlesScene.light.dispose();
+    particlesScene.light = null;
+  }
+
+  // Clear scene reference
+  particlesScene.scene = null;
+  particlesScene.nbParticles = 0;
+  particlesScene.elapsedTime = 0;
+
+  console.log('[Particles] Cleanup complete');
 }

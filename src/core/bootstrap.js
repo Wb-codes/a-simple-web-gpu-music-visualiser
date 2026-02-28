@@ -16,11 +16,12 @@ import { audioBass, audioMid, audioHigh, audioOverall } from '../audio/uniforms.
  * @type {Object}
  */
 const appState = {
-    settings: null,
-    isInitialized: false,
-    onSettingsChange: null,
-    onAudioUpdate: null,
-    onRender: null
+  settings: null,
+  isInitialized: false,
+  onSettingsChange: null,
+  onAudioUpdate: null,
+  onRender: null,
+  resizeHandler: null
 };
 
 /**
@@ -95,15 +96,17 @@ export async function initVisualization(options) {
             autoRotateSpeed: settings.autoRotateSpeed.value
         });
         
-        console.log('[Bootstrap] Renderer initialized');
-        console.log('[Bootstrap] Canvas:', document.querySelector('canvas'));
-        
-        window.addEventListener('resize', () => onWindowResize(
-            rendererConfig.width,
-            rendererConfig.height
-        ));
-        
-        appState.isInitialized = true;
+    console.log('[Bootstrap] Renderer initialized');
+    console.log('[Bootstrap] Canvas:', document.querySelector('canvas'));
+
+    // Store resize handler reference for cleanup
+    appState.resizeHandler = () => onWindowResize(
+      rendererConfig.width,
+      rendererConfig.height
+    );
+    window.addEventListener('resize', appState.resizeHandler);
+
+    appState.isInitialized = true;
     }
 
     // Reset camera
@@ -125,14 +128,18 @@ export async function initVisualization(options) {
     // Start animation loop
     setAnimationLoop(() => animate());
 
-    // Return scene and cleanup function
-    return {
-        scene,
-        cleanup: () => {
-            setAnimationLoop(null);
-            appState.isInitialized = false;
-        }
-    };
+  // Return scene and cleanup function
+  return {
+    scene,
+    cleanup: () => {
+      setAnimationLoop(null);
+      if (appState.resizeHandler) {
+        window.removeEventListener('resize', appState.resizeHandler);
+        appState.resizeHandler = null;
+      }
+      appState.isInitialized = false;
+    }
+  };
 }
 
 /**

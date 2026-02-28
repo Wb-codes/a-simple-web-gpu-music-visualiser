@@ -175,16 +175,20 @@ export function applyFadeBehavior(element, fadeDelay = DEFAULT_FADE_DELAY) {
   const key = element.id || `fade-${Date.now()}-${Math.random()}`;
   activeControllers.set(key, controller);
 
-  // Add direct event listeners for immediate response
-  element.addEventListener('mouseenter', () => {
+  // Store event listener references for cleanup
+  const mouseEnterHandler = () => {
     controller.isHovering = true;
     controller.showElement();
-  });
+  };
 
-  element.addEventListener('mouseleave', () => {
+  const mouseLeaveHandler = () => {
     controller.isHovering = false;
     controller.startFadeTimer();
-  });
+  };
+
+  // Add direct event listeners for immediate response
+  element.addEventListener('mouseenter', mouseEnterHandler);
+  element.addEventListener('mouseleave', mouseLeaveHandler);
 
   // Start initial timer
   controller.startFadeTimer();
@@ -193,8 +197,8 @@ export function applyFadeBehavior(element, fadeDelay = DEFAULT_FADE_DELAY) {
   return function cleanup() {
     clearTimeout(controller.fadeTimer);
     activeControllers.delete(key);
-    element.removeEventListener('mouseenter', () => {});
-    element.removeEventListener('mouseleave', () => {});
+    element.removeEventListener('mouseenter', mouseEnterHandler);
+    element.removeEventListener('mouseleave', mouseLeaveHandler);
     element.classList.remove('fade-ui', 'fade-visible', 'fade-hidden');
     stopMouseListener();
   };
