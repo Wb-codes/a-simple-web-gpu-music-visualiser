@@ -73,49 +73,11 @@ export function filterSettings(settings, keys) {
  * @constant {Object.<string, Array<string>>}
  */
 export const SETTING_CATEGORIES = {
-    audio: [
-        'bassSensitivity',
-        'midSensitivity',
-        'highSensitivity'
-    ],
-    bass: [
-        'bassSpawnRate',
-        'bassRadius',
-        'bassBloom'
-    ],
-    mid: [
-        'midTurbulence',
-        'midFrequency',
-        'midSpeed'
-    ],
-    high: [
-        'highSize',
-        'highColorSpeed'
-    ],
-    base: [
-        'baseSpawnRate',
-        'baseTurbulence',
-        'baseSize',
-        'baseRadius'
-    ],
-    bloom: [
-        'bloomStrength',
-        'bloomThreshold',
-        'bloomRadius'
-    ],
-    camera: [
-        'autoRotate',
-        'autoRotateSpeed'
-    ],
-    points: [
-        'pulseSpeed',
-        'minWidth',
-        'maxWidth'
-    ],
-    spout: [
-        'spoutEnabled',
-        'spoutSenderName'
-    ]
+	audio: [
+	'bassSensitivity',
+	'midSensitivity',
+	'highSensitivity'
+]
 };
 
 /**

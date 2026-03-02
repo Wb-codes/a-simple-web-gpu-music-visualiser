@@ -6,21 +6,11 @@
 
 import { SCENE_NAMES } from '../core/constants.js';
 import { ANIMATION_NAMES, DEFAULT_ANIMATION, DYNAMIC_ANIMATION_NAMES } from '../core/animations.js';
-import { 
-  AVAILABLE_MODELS, 
-  switchAnimation, 
-  loadModel, 
-  importGLBFile, 
-  reloadCurrentModel,
-  setOnAnimationsLoaded,
-  getAvailableAnimations,
-  DISCOVERED_GLBS,
-  scanSkinningFolder,
-  loadAdditionalModel,
-  toggleModelVisibility,
-  loadedAdditionalModels,
-  removeAdditionalModel,
-  currentModelPath
+import {
+AVAILABLE_MODELS,
+switchAnimation,
+setOnAnimationsLoaded,
+getAvailableAnimations
 } from '../scenes/skinning.js';
 import { applyFadeBehavior, removeAllFadeBehaviors, applyFadeToSettingsButton } from './fade-manager.js';
 
@@ -300,242 +290,43 @@ export function createGUI(settings, customContainer, onSettingChange) {
     addSlider(overallFolder.content, settings.overallLifetime, handleChange);
     container.appendChild(overallFolder.folder);
     
-    // Base Values folder
-    const baseFolder = createFolder('Base Values');
-    addSlider(baseFolder.content, settings.baseSpawnRate, handleChange);
-    addSlider(baseFolder.content, settings.baseTurbulence, handleChange);
-    addSlider(baseFolder.content, settings.baseSize, handleChange);
-    addSlider(baseFolder.content, settings.baseRadius, handleChange);
-    container.appendChild(baseFolder.folder);
-    
-    // Instanced Points folder
-    const pointsFolder = createFolder('Instanced Points');
-    addSlider(pointsFolder.content, settings.pulseSpeed, handleChange);
-    addSlider(pointsFolder.content, settings.minWidth, handleChange);
-    addSlider(pointsFolder.content, settings.maxWidth, handleChange);
-    container.appendChild(pointsFolder.folder);
-    
-    // Bloom folder
-    const bloomFolder = createFolder('Bloom');
-    addSlider(bloomFolder.content, settings.bloomStrength, handleChange);
-    addSlider(bloomFolder.content, settings.bloomThreshold, handleChange);
-    addSlider(bloomFolder.content, settings.bloomRadius, handleChange);
-    container.appendChild(bloomFolder.folder);
-    
-    // Camera folder
-    const cameraFolder = createFolder('Camera');
-    addSlider(cameraFolder.content, settings.autoRotate, handleChange);
-    addSlider(cameraFolder.content, settings.autoRotateSpeed, handleChange);
-    container.appendChild(cameraFolder.folder);
-    
-    // Output folder
-    const outputFolder = createFolder('Output');
-    addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
-    container.appendChild(outputFolder.folder);
-    
-    // Show by default
-    container.classList.add('visible');
-    if (toggleBtn) {
-        toggleBtn.textContent = 'Hide';
-    }
-    
-    return { container, toggleBtn };
+	// Base Values folder
+	const baseFolder = createFolder('Base Values');
+	addSlider(baseFolder.content, settings.baseSpawnRate, handleChange);
+	addSlider(baseFolder.content, settings.baseTurbulence, handleChange);
+	addSlider(baseFolder.content, settings.baseSize, handleChange);
+	addSlider(baseFolder.content, settings.baseRadius, handleChange);
+	container.appendChild(baseFolder.folder);
+
+	// Bloom folder
+	const bloomFolder = createFolder('Bloom');
+	addSlider(bloomFolder.content, settings.bloomStrength, handleChange);
+	addSlider(bloomFolder.content, settings.bloomThreshold, handleChange);
+	addSlider(bloomFolder.content, settings.bloomRadius, handleChange);
+	container.appendChild(bloomFolder.folder);
+
+	// Camera folder
+	const cameraFolder = createFolder('Camera');
+	addSlider(cameraFolder.content, settings.autoRotate, handleChange);
+	addSlider(cameraFolder.content, settings.autoRotateSpeed, handleChange);
+	container.appendChild(cameraFolder.folder);
+
+	// Output folder
+	const outputFolder = createFolder('Output');
+	addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
+	container.appendChild(outputFolder.folder);
+
+	// Show by default
+	container.classList.add('visible');
+	if (toggleBtn) {
+		toggleBtn.textContent = 'Hide';
+	}
+
+	return { container, toggleBtn };
 }
 
 /**
- * Create Spout controls (Electron only).
- * @param {HTMLElement} container - Container to append controls to
- * @param {Object} settings - Settings object
- * @param {Function} onEnableChange - Callback when enable state changes
- * @param {Function} onNameChange - Callback when sender name changes
- * @param {Function} [onResolutionChange] - Callback when resolution changes
- * @param {Function} [onFrameSkipChange] - Callback when frame skip changes
- * @returns {{folder: HTMLElement, enableCheckbox: HTMLInputElement, nameInput: HTMLInputElement}}
- */
-export function createSpoutControls(container, settings, onEnableChange, onNameChange, onResolutionChange, onFrameSkipChange) {
-  const spoutFolder = createFolder('Spout Output');
-
-  // Enable checkbox
-  const enableRow = document.createElement('div');
-  enableRow.className = 'control-row';
-  const enableLabel = document.createElement('label');
-  enableLabel.textContent = 'Enable Spout';
-  const enableCheckbox = document.createElement('input');
-  enableCheckbox.type = 'checkbox';
-  enableCheckbox.checked = settings.spoutEnabled.value;
-  enableCheckbox.onchange = async () => {
-    await onEnableChange(enableCheckbox.checked);
-  };
-  enableRow.appendChild(enableLabel);
-  enableRow.appendChild(enableCheckbox);
-  spoutFolder.content.appendChild(enableRow);
-
-  // Sender name input
-  const nameRow = document.createElement('div');
-  nameRow.className = 'control-row';
-  const nameLabel = document.createElement('label');
-  nameLabel.textContent = 'Sender Name';
-  const nameInput = document.createElement('input');
-  nameInput.type = 'text';
-  nameInput.value = settings.spoutSenderName.value;
-  nameInput.style.flex = '1';
-  nameInput.style.marginLeft = '8px';
-  nameInput.style.background = '#222';
-  nameInput.style.border = '1px solid #444';
-  nameInput.style.color = '#fff';
-  nameInput.style.padding = '4px 8px';
-  nameInput.style.borderRadius = '3px';
-  nameInput.onchange = async () => {
-    settings.spoutSenderName.value = nameInput.value;
-    if (onNameChange) await onNameChange(nameInput.value);
-  };
-  nameRow.appendChild(nameLabel);
-  nameRow.appendChild(nameInput);
-  spoutFolder.content.appendChild(nameRow);
-
-  // Resolution selector
-  const resolutionRow = document.createElement('div');
-  resolutionRow.className = 'control-row';
-  const resolutionLabel = document.createElement('label');
-  resolutionLabel.textContent = 'Resolution';
-  const resolutionSelect = document.createElement('select');
-  resolutionSelect.style.cssText = `
-    flex: 1;
-    margin-left: 8px;
-    background: #222;
-    border: 1px solid #444;
-    color: #fff;
-    padding: 4px 8px;
-    border-radius: 3px;
-  `;
-  ['1080p', '720p'].forEach(res => {
-    const option = document.createElement('option');
-    option.value = res;
-    option.textContent = res;
-    if (res === settings.spoutResolution?.value) option.selected = true;
-    resolutionSelect.appendChild(option);
-  });
-  resolutionSelect.onchange = async () => {
-    settings.spoutResolution.value = resolutionSelect.value;
-    if (onResolutionChange) await onResolutionChange(resolutionSelect.value);
-  };
-  resolutionRow.appendChild(resolutionLabel);
-  resolutionRow.appendChild(resolutionSelect);
-  spoutFolder.content.appendChild(resolutionRow);
-
-  // Frame skip slider
-  const frameSkipRow = document.createElement('div');
-  frameSkipRow.className = 'control-row';
-  const frameSkipLabel = document.createElement('label');
-  frameSkipLabel.textContent = 'Frame Skip';
-  const frameSkipInput = document.createElement('input');
-  frameSkipInput.type = 'range';
-  frameSkipInput.min = 0;
-  frameSkipInput.max = 2;
-  frameSkipInput.step = 1;
-  frameSkipInput.value = settings.spoutFrameSkip?.value || 0;
-  frameSkipInput.style.flex = '1';
-  frameSkipInput.style.margin = '0 8px';
-  frameSkipInput.style.accentColor = '#667eea';
-  const frameSkipValue = document.createElement('span');
-  frameSkipValue.className = 'value';
-  frameSkipValue.style.width = '45px';
-  frameSkipValue.style.textAlign = 'right';
-  frameSkipValue.style.color = '#888';
-  frameSkipValue.style.fontSize = '10px';
-  const frameSkipLabels = ['60fps', '30fps', '20fps'];
-  frameSkipValue.textContent = frameSkipLabels[frameSkipInput.value];
-  frameSkipInput.oninput = () => {
-    const skip = parseInt(frameSkipInput.value);
-    settings.spoutFrameSkip.value = skip;
-    frameSkipValue.textContent = frameSkipLabels[skip];
-    if (onFrameSkipChange) onFrameSkipChange(skip);
-  };
-  frameSkipRow.appendChild(frameSkipLabel);
-  frameSkipRow.appendChild(frameSkipInput);
-  frameSkipRow.appendChild(frameSkipValue);
-  spoutFolder.content.appendChild(frameSkipRow);
-
-  container.appendChild(spoutFolder.folder);
-
-  return { folder: spoutFolder.folder, enableCheckbox, nameInput };
-}
-
-/**
- * Create GUI specifically for Instanced Points scene.
- * Audio-reactive parameters with sensitivity controls.
- * 
- * @param {Object} settings - Settings object
- * @param {HTMLElement} container - Container element
- * @param {Function} onChange - Callback when settings change
- * @param {boolean} isElectron - Whether running in Electron mode
- */
-export function createPointsGUI(settings, container, onChange, isElectron) {
-  const handleChange = () => {
-    if (onChange) onChange();
-  };
-
-  // Get toggle button
-  const toggleBtn = document.getElementById('toggle-controls');
-
-  // Setup toggle button
-  if (toggleBtn) {
-    toggleBtn.classList.add('visible');
-    toggleBtn.textContent = 'Hide';
-    toggleBtn.onclick = () => {
-      container.classList.toggle('visible');
-      toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
-    };
-  }
-
-  // Clear existing content
-  container.innerHTML = '';
-
-  // Point Size folder (4-slider)
-  const sizeFolder = createFolder('Point Size', container);
-  addSlider(sizeFolder.content, settings.pointsSizeIntensity, handleChange);
-  addSlider(sizeFolder.content, settings.pointsSizeBass, handleChange);
-  addSlider(sizeFolder.content, settings.pointsSizeMid, handleChange);
-  addSlider(sizeFolder.content, settings.pointsSizeHigh, handleChange);
-
-  // Radial Displacement folder (4-slider)
-  const displacementFolder = createFolder('Radial Displacement', container);
-  addSlider(displacementFolder.content, settings.pointsDisplacementIntensity, handleChange);
-  addSlider(displacementFolder.content, settings.pointsDisplacementBass, handleChange);
-  addSlider(displacementFolder.content, settings.pointsDisplacementMid, handleChange);
-  addSlider(displacementFolder.content, settings.pointsDisplacementHigh, handleChange);
-
-  // Pulse Speed folder (4-slider)
-  const pulseFolder = createFolder('Pulse Speed', container);
-  addSlider(pulseFolder.content, settings.pointsPulseIntensity, handleChange);
-  addSlider(pulseFolder.content, settings.pointsPulseBass, handleChange);
-  addSlider(pulseFolder.content, settings.pointsPulseMid, handleChange);
-  addSlider(pulseFolder.content, settings.pointsPulseHigh, handleChange);
-
-  // Rotation Speed folder (4-slider)
-  const rotationFolder = createFolder('Rotation Speed', container);
-  addSlider(rotationFolder.content, settings.pointsRotationIntensity, handleChange);
-  addSlider(rotationFolder.content, settings.pointsRotationBass, handleChange);
-  addSlider(rotationFolder.content, settings.pointsRotationMid, handleChange);
-  addSlider(rotationFolder.content, settings.pointsRotationHigh, handleChange);
-
-  // Curve Count folder (4-slider)
-  const curveFolder = createFolder('Curve Count', container);
-  addSlider(curveFolder.content, settings.pointsCurveCountIntensity, handleChange);
-  addSlider(curveFolder.content, settings.pointsCurveCountBass, handleChange);
-  addSlider(curveFolder.content, settings.pointsCurveCountMid, handleChange);
-  addSlider(curveFolder.content, settings.pointsCurveCountHigh, handleChange);
-
-  // Wave Speed folder (4-slider) - controls how fast the "snake" travels
-  const waveSpeedFolder = createFolder('Wave Speed', container);
-  addSlider(waveSpeedFolder.content, settings.pointsWaveSpeedIntensity, handleChange);
-  addSlider(waveSpeedFolder.content, settings.pointsWaveSpeedBass, handleChange);
-  addSlider(waveSpeedFolder.content, settings.pointsWaveSpeedMid, handleChange);
-  addSlider(waveSpeedFolder.content, settings.pointsWaveSpeedHigh, handleChange);
-
-  // Wave Length folder (single slider) - controls how many points are in the wave chain
-  const waveLengthFolder = createFolder('Wave Length', container);
-  addSlider(waveLengthFolder.content, settings.pointsWaveLength, handleChange);
+* Create GUI for Linked Particles scene.
 
   // Bloom folder (audio-reactive)
   const bloomFolder = createFolder('Bloom', container);
@@ -544,61 +335,27 @@ export function createPointsGUI(settings, container, onChange, isElectron) {
   addSlider(bloomFolder.content, settings.bloomMid, handleChange);
   addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
 
-  // Output folder
-  const outputFolder = createFolder('Output', container);
-  addSlider(outputFolder.content, settings.autoRotate, handleChange);
-  addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
-  addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
+	// Output folder
+	const outputFolder = createFolder('Output', container);
+	addSlider(outputFolder.content, settings.autoRotate, handleChange);
+	addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
+	addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
 
-  // Spout controls (Electron only)
-  if (isElectron) {
-    createSpoutControls(outputFolder.content, settings, async (enabled) => {
-      if (enabled) {
-        const options = {
-          resolution: settings.spoutResolution?.value || '1080p',
-          frameSkip: settings.spoutFrameSkip?.value || 0
-        };
-        const result = await window.spoutAPI.enable(options);
-        if (result.success) {
-          settings.spoutEnabled.value = true;
-          if (onChange) onChange();
-        }
-      } else {
-        await window.spoutAPI.disable();
-        settings.spoutEnabled.value = false;
-        if (onChange) onChange();
-      }
-    }, async (name) => {
-      settings.spoutSenderName.value = name;
-      if (settings.spoutEnabled.value) {
-        await window.spoutAPI.updateName(name);
-      }
-    }, async (resolution) => {
-      settings.spoutResolution.value = resolution;
-    }, async (frameSkip) => {
-      settings.spoutFrameSkip.value = frameSkip;
-      if (settings.spoutEnabled.value) {
-        await window.spoutAPI.updateFrameSkip(frameSkip);
-      }
-    });
-  }
+	// Show container by default
+	container.classList.add('visible');
 
-  // Show container by default
-  container.classList.add('visible');
-
-  // Apply fade behavior to settings panel
-  applyFadeBehavior(container);
+	// Apply fade behavior to settings panel
+	applyFadeBehavior(container);
 }
 
 /**
- * Create GUI for Linked Particles scene.
- * 
- * @param {Object} settings - Settings object
- * @param {HTMLElement} container - Container element
- * @param {Function} onChange - Callback when settings change
- * @param {boolean} isElectron - Whether running in Electron mode
- */
-export function createParticlesGUI(settings, container, onChange, isElectron) {
+* Create GUI for Linked Particles scene.
+*
+* @param {Object} settings - Settings object
+* @param {HTMLElement} container - Container element
+* @param {Function} onChange - Callback when settings change
+*/
+export function createParticlesGUI(settings, container, onChange) {
     const handleChange = () => {
         if (onChange) onChange();
     };
@@ -647,406 +404,91 @@ export function createParticlesGUI(settings, container, onChange, isElectron) {
     addSlider(bloomFolder.content, settings.bloomMid, handleChange);
     addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
     
-    // Output folder
-    const outputFolder = createFolder('Output', container);
-    addSlider(outputFolder.content, settings.autoRotate, handleChange);
-    addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
-    addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
-    
-  // Spout controls (Electron only)
-  if (isElectron) {
-    createSpoutControls(outputFolder.content, settings, async (enabled) => {
-      if (enabled) {
-        const options = {
-          resolution: settings.spoutResolution?.value || '1080p',
-          frameSkip: settings.spoutFrameSkip?.value || 0
-        };
-        const result = await window.spoutAPI.enable(options);
-        if (result.success) {
-          settings.spoutEnabled.value = true;
-          if (onChange) onChange();
-        }
-      } else {
-        await window.spoutAPI.disable();
-        settings.spoutEnabled.value = false;
-        if (onChange) onChange();
-      }
-    }, async (name) => {
-      settings.spoutSenderName.value = name;
-      if (settings.spoutEnabled.value) {
-        await window.spoutAPI.updateName(name);
-      }
-    }, async (resolution) => {
-      settings.spoutResolution.value = resolution;
-    }, async (frameSkip) => {
-      settings.spoutFrameSkip.value = frameSkip;
-      if (settings.spoutEnabled.value) {
-        await window.spoutAPI.updateFrameSkip(frameSkip);
-      }
-    });
-  }
+	// Output folder
+	const outputFolder = createFolder('Output', container);
+	addSlider(outputFolder.content, settings.autoRotate, handleChange);
+	addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
+	addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
 
-  // Show container by default
-  container.classList.add('visible');
+	// Show container by default
+	container.classList.add('visible');
 
-  // Apply fade behavior to settings panel
-  applyFadeBehavior(container);
+	// Apply fade behavior to settings panel
+	applyFadeBehavior(container);
 }
 
 /**
- * Create GUI for Skinning Points scene.
- * 
- * @param {Object} settings - Settings object
- * @param {HTMLElement} container - Container element
- * @param {Function} onChange - Callback when settings change
- * @param {boolean} isElectron - Whether running in Electron mode
- */
-export function createSkinningGUI(settings, container, onChange, isElectron) {
-  const handleChange = () => {
-    if (onChange) onChange();
-  };
+* Create GUI for Skinning Points scene.
+*
+* @param {Object} settings - Settings object
+* @param {HTMLElement} container - Container element
+* @param {Function} onChange - Callback when settings change
+*/
+export function createSkinningGUI(settings, container, onChange) {
+const handleChange = () => {
+	if (onChange) onChange();
+};
 
-  // Get toggle button
-  const toggleBtn = document.getElementById('toggle-controls');
+// Get toggle button
+const toggleBtn = document.getElementById('toggle-controls');
 
-  // Setup toggle button
-  if (toggleBtn) {
-    toggleBtn.classList.add('visible');
-    toggleBtn.textContent = 'Hide';
-    toggleBtn.onclick = () => {
-      container.classList.toggle('visible');
-      toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
-    };
-  }
-
-  // Clear existing content
-  container.innerHTML = '';
-
-  // Model Selection folder
-  const modelFolder = createFolder('Model', container);
-  
-  // Model selector dropdown
-  const modelLabel = document.createElement('label');
-  modelLabel.textContent = 'Select Model:';
-  modelLabel.style.cssText = 'color: #fff; font-size: 12px; display: block; margin-bottom: 5px;';
-  modelFolder.content.appendChild(modelLabel);
-  
-  const modelSelect = document.createElement('select');
-  modelSelect.style.cssText = `
-    width: 100%;
-    background: #333;
-    color: #fff;
-    border: 1px solid #555;
-    border-radius: 3px;
-    padding: 6px 8px;
-    font-size: 12px;
-    cursor: pointer;
-    margin-bottom: 10px;
-  `;
-  
-  // Add available models
-  AVAILABLE_MODELS.forEach((model, index) => {
-    const option = document.createElement('option');
-    option.value = model.path;
-    option.textContent = model.name;
-    if (index === 0) option.selected = true;
-    modelSelect.appendChild(option);
-  });
-  
-  modelFolder.content.appendChild(modelSelect);
-  
-  // Reload button
-  const reloadBtn = document.createElement('button');
-  reloadBtn.textContent = '↻ Reload Model';
-  reloadBtn.style.cssText = `
-    background: #444;
-    color: #fff;
-    border: 1px solid #555;
-    border-radius: 3px;
-    padding: 6px 12px;
-    font-size: 11px;
-    cursor: pointer;
-    width: 100%;
-    margin-top: 5px;
-  `;
-  reloadBtn.onmouseenter = () => reloadBtn.style.background = '#555';
-  reloadBtn.onmouseleave = () => reloadBtn.style.background = '#444';
-  reloadBtn.onclick = async () => {
-    reloadBtn.textContent = 'Loading...';
-    reloadBtn.disabled = true;
-    try {
-      const result = await reloadCurrentModel();
-      console.log('[GUI] Reload successful:', result);
-      reloadBtn.textContent = '↻ Reload Model';
-    } catch (error) {
-      console.error('[GUI] Reload failed:', error);
-      reloadBtn.textContent = `Error! ${error.message || 'Unknown'}`;
-    }
-    reloadBtn.disabled = false;
-  };
-  modelFolder.content.appendChild(reloadBtn);
-  
-  // Handle model selection change
-  modelSelect.addEventListener('change', async (e) => {
-    const selectedPath = e.target.value;
-    modelSelect.disabled = true;
-    reloadBtn.textContent = 'Loading...';
-    try {
-      await loadModel(selectedPath);
-      // Animation picker will be updated via callback
-    } catch (error) {
-      console.error('Failed to load model:', error);
-      reloadBtn.textContent = 'Error Loading';
-    }
-    modelSelect.disabled = false;
-    reloadBtn.textContent = '↻ Reload Model';
-  });
-
-  // File Import folder
-  const importFolder = createFolder('Import GLB', container);
-  
-  // Drop zone
-  const dropZone = document.createElement('div');
-  dropZone.id = 'glb-drop-zone';
-  dropZone.style.cssText = `
-    border: 2px dashed #555;
-    border-radius: 5px;
-    padding: 20px;
-    text-align: center;
-    color: #888;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    background: rgba(30, 30, 30, 0.5);
-  `;
-  dropZone.innerHTML = `
-    <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
-    <div>Drop GLB file here</div>
-    <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
-  `;
-  
-  // Drag effects
-  dropZone.addEventListener('dragenter', (e) => {
-    e.preventDefault();
-    dropZone.style.borderColor = '#667eea';
-    dropZone.style.background = 'rgba(102, 126, 234, 0.1)';
-  });
-  
-  dropZone.addEventListener('dragleave', (e) => {
-    e.preventDefault();
-    dropZone.style.borderColor = '#555';
-    dropZone.style.background = 'rgba(30, 30, 30, 0.5)';
-  });
-  
-  dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-  });
-  
-  dropZone.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    dropZone.style.borderColor = '#555';
-    dropZone.style.background = 'rgba(30, 30, 30, 0.5)';
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0 && files[0].name.endsWith('.glb')) {
-      await handleGLBImport(files[0]);
-    } else {
-      dropZone.innerHTML = `<div style="color: #ff6b6b;">Please drop a .glb file</div>`;
-      setTimeout(() => {
-        dropZone.innerHTML = `
-          <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
-          <div>Drop GLB file here</div>
-          <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
-        `;
-      }, 2000);
-    }
-  });
-  
-  // Click to browse
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = '.glb';
-  fileInput.style.display = 'none';
-  fileInput.addEventListener('change', async (e) => {
-    if (e.target.files.length > 0) {
-      await handleGLBImport(e.target.files[0]);
-    }
-  });
-  
-  dropZone.addEventListener('click', () => fileInput.click());
-  
-  importFolder.content.appendChild(dropZone);
-  importFolder.content.appendChild(fileInput);
-  
-// Import handler
-async function handleGLBImport(file) {
-  console.log(`[GUI] Starting import for: ${file.name}`);
-  dropZone.innerHTML = `<div style="color: #667eea;">Importing ${file.name}...</div>`;
-  
-  try {
-    const result = await importGLBFile(file);
-    console.log(`[GUI] Import result:`, result);
-
-    // Add to model dropdown - check if option already exists
-    // Use the indexeddb:// path format for proper loading
-    const indexedPath = `indexeddb://${result.modelName}.glb`;
-    console.log(`[GUI] Adding to dropdown with path: ${indexedPath}`);
-    
-    const existingOption = Array.from(modelSelect.options).find(opt => opt.value === indexedPath);
-    if (!existingOption) {
-      const option = document.createElement('option');
-      option.value = indexedPath;
-      option.textContent = result.modelName;
-      modelSelect.appendChild(option);
-      console.log(`[GUI] Added option for: ${result.modelName}`);
-    } else {
-      console.log(`[GUI] Option already exists for: ${result.modelName}`);
-    }
-
-    // Refresh model pickers to show in checkbox lists
-    console.log(`[GUI] Refreshing model pickers...`);
-    await createModelPickers();
-    console.log(`[GUI] Model pickers refreshed`);
-
-    dropZone.innerHTML = `
-      <div style="color: #51cf66;">✓ ${file.name} imported! (${result.hasAnimations ? 'Animated' : 'Static'})</div>
-    `;
-    setTimeout(() => {
-      dropZone.innerHTML = `
-        <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
-        <div>Drop GLB file here</div>
-        <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
-      `;
-    }, 3000);
-
-    // Notify settings change if callback exists
-    if (onChange && typeof onChange === 'function') {
-      onChange();
-    }
-  } catch (error) {
-    console.error('[GUI] Import failed:', error);
-    dropZone.innerHTML = `
-      <div style="color: #ff6b6b;">Failed to import: ${error.message || 'Unknown error'}</div>
-    `;
-    setTimeout(() => {
-      dropZone.innerHTML = `
-        <div style="font-size: 24px; margin-bottom: 5px;">📁</div>
-        <div>Drop GLB file here</div>
-        <div style="font-size: 10px; margin-top: 5px; color: #666;">or click to browse</div>
-      `;
-    }, 3000);
-  }
+// Setup toggle button
+if (toggleBtn) {
+	toggleBtn.classList.add('visible');
+	toggleBtn.textContent = 'Hide';
+	toggleBtn.onclick = () => {
+	container.classList.toggle('visible');
+	toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
+	};
 }
 
-  // Bloom folder
-  const bloomFolder = createFolder('Bloom', container);
-  addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);
-  addSlider(bloomFolder.content, settings.bloomBass, handleChange);
-  addSlider(bloomFolder.content, settings.bloomMid, handleChange);
-  addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
+// Clear existing content
+container.innerHTML = '';
 
-  // Output folder
-  const outputFolder = createFolder('Output', container);
-  addSlider(outputFolder.content, settings.autoRotate, handleChange);
-  addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
-  addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
+// Model info
+const infoFolder = createFolder('Model Info', container);
+const infoText = document.createElement('div');
+infoText.style.cssText = 'color: #888; font-size: 11px; padding: 5px 0;';
+infoText.innerHTML = `
+	<p style="margin: 3px 0;">Place GLB files in:</p>
+	<p style="margin: 3px 0; color: #667eea;">models/gltf/skinning/</p>
+	<p style="margin: 8px 0 3px 0;">Available models:</p>
+`;
+AVAILABLE_MODELS.forEach(m => {
+	infoText.innerHTML += `<p style="margin: 2px 0; color: #51cf66;">• ${m.name}</p>`;
+});
+infoFolder.content.appendChild(infoText);
 
-  // Spout controls (Electron only)
-  if (isElectron) {
-    createSpoutControls(outputFolder.content, settings, async (enabled) => {
-      if (enabled) {
-        const options = {
-          resolution: settings.spoutResolution?.value || '1080p',
-          frameSkip: settings.spoutFrameSkip?.value || 0
-        };
-        const result = await window.spoutAPI.enable(options);
-        if (result.success) {
-          settings.spoutEnabled.value = true;
-          if (onChange) onChange();
-        }
-      } else {
-        await window.spoutAPI.disable();
-        settings.spoutEnabled.value = false;
-        if (onChange) onChange();
-      }
-    }, async (name) => {
-      settings.spoutSenderName.value = name;
-      if (settings.spoutEnabled.value) {
-        await window.spoutAPI.updateName(name);
-      }
-    }, async (resolution) => {
-      settings.spoutResolution.value = resolution;
-    }, async (frameSkip) => {
-      settings.spoutFrameSkip.value = frameSkip;
-      if (settings.spoutEnabled.value) {
-        await window.spoutAPI.updateFrameSkip(frameSkip);
-      }
-    });
-  }
+// Animation dropdown will be created via callback when model loads
+// Set up callback for when animations are loaded
+setOnAnimationsLoaded((animationNames, defaultAnimation) => {
+	createAnimationPicker(defaultAnimation || animationNames[0], animationNames, (newAnimation) => {
+	switchAnimation(newAnimation);
+	});
+});
 
-  // Show container by default
-  container.classList.add('visible');
+// Bloom folder
+const bloomFolder = createFolder('Bloom', container);
+addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);
+addSlider(bloomFolder.content, settings.bloomBass, handleChange);
+addSlider(bloomFolder.content, settings.bloomMid, handleChange);
+addSlider(bloomFolder.content, settings.bloomHigh, handleChange);
 
-  // Apply fade behavior to settings panel
-  applyFadeBehavior(container);
+// Output folder
+const outputFolder = createFolder('Output', container);
+addSlider(outputFolder.content, settings.autoRotate, handleChange);
+addSlider(outputFolder.content, settings.autoRotateSpeed, handleChange);
+addCheckbox(outputFolder.content, settings.greenScreen, handleChange);
 
-  // Create the top bar with all three dropdowns
-  let modelPickersContainer = null;
-  
-  async function createModelPickers() {
-    // Remove old pickers
-    if (modelPickersContainer) {
-      modelPickersContainer.remove();
-    }
-    
-    // Scan for GLB files
-    await scanSkinningFolder();
-    
-    // Create container for all pickers
-    modelPickersContainer = document.createElement('div');
-    modelPickersContainer.id = 'model-pickers-container';
-    modelPickersContainer.style.cssText = `
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 200;
-      display: flex;
-      align-items: flex-start;
-      gap: 20px;
-      background: rgba(20, 23, 26, 0.9);
-      padding: 8px 16px;
-      border-radius: 5px;
-    `;
-    
-  // === LEFT: Animated Models Dropdown ===
-  const animatedContainer = createModelDropdown(
-    'Animated Models',
-    DISCOVERED_GLBS.animated,
-    true, // has checkboxes
-    async (modelName, isChecked) => {
-      console.log(`[GUI] Animated model ${modelName} checkbox changed: ${isChecked}`);
-      if (isChecked) {
-        // Load the model
-        const modelInfo = DISCOVERED_GLBS.animated.find(m => m.name === modelName);
-        if (modelInfo) {
-          try {
-            // Check if this is an imported model - if so, replace main model
-            if (modelInfo.isImported) {
-              console.log(`[GUI] Imported animated model checked - replacing main model: ${modelName}`);
-              // Uncheck all other models first
-              const allCheckboxes = document.querySelectorAll('#model-pickers-container input[type="checkbox"]');
-              allCheckboxes.forEach(cb => {
-                if (cb.checked && cb.dataset.modelName !== modelName) {
-                  cb.checked = false;
-                }
-              });
-              // Load as main model
-              await loadModel(modelInfo.path);
-              // Update the main dropdown selection
-              modelSelect.value = modelInfo.path;
-            } else {
-              // Regular model - unload other animated models and load as additional
+// Show container by default
+container.classList.add('visible');
+
+// Apply fade behavior to settings panel
+applyFadeBehavior(container);
+}
+
+/**
+* Create animation picker dropdown at the top center of the screen.
               console.log(`[GUI] Loading animated model: ${modelInfo.path}`);
               for (const [name, data] of loadedAdditionalModels) {
                 if (data.hasAnimations && name !== modelName) {
@@ -1060,106 +502,15 @@ async function handleGLBImport(file) {
           }
         }
       } else {
-        // Unload the model completely when unchecked
-        console.log(`[GUI] Unloading animated model: ${modelName}`);
-        removeAdditionalModel(modelName);
-      }
-    }
-  );
-    
-  // === CENTER: Animation Picker ===
-  const availableAnims = getAvailableAnimations();
-  console.log(`[GUI] Creating animation picker with ${availableAnims.length} animations:`, availableAnims);
-  
-  const animationContainer = createAnimationPicker(
-    settings.currentAnimation.value,
-    availableAnims,
-    (animationName) => {
-      console.log(`[GUI] Animation selected: ${animationName}`);
-      settings.currentAnimation.value = animationName;
-      const result = switchAnimation(animationName);
-      console.log(`[GUI] switchAnimation result: ${result}`);
-      if (onChange) onChange();
-    }
-  );
-    // Remove fade behavior from animation picker (handled by container)
-    animationContainer.style.position = 'static';
-    animationContainer.style.transform = 'none';
-    animationContainer.style.background = 'transparent';
-    
-  // === RIGHT: Static Models Dropdown ===
-  const staticContainer = createModelDropdown(
-    'Static Models',
-    DISCOVERED_GLBS.static,
-    true, // has checkboxes
-    async (modelName, isChecked) => {
-      console.log(`[GUI] Static model ${modelName} checkbox changed: ${isChecked}`);
-      if (isChecked) {
-        // Load the model
-        const modelInfo = DISCOVERED_GLBS.static.find(m => m.name === modelName);
-        console.log(`[GUI] Looking for static model info:`, modelInfo);
-        if (modelInfo) {
-          try {
-            // Check if this is an imported model - if so, replace main model
-            if (modelInfo.isImported) {
-              console.log(`[GUI] Imported static model checked - replacing main model: ${modelName}`);
-              // Uncheck all other models first
-              const allCheckboxes = document.querySelectorAll('#model-pickers-container input[type="checkbox"]');
-              allCheckboxes.forEach(cb => {
-                if (cb.checked && cb.dataset.modelName !== modelName) {
-                  cb.checked = false;
-                }
-              });
-              // Load as main model
-              await loadModel(modelInfo.path);
-              // Update the main dropdown selection
-              modelSelect.value = modelInfo.path;
-            } else {
-              // Regular model - load as additional
-              console.log(`[GUI] Loading static model: ${modelInfo.path}`);
-              await loadAdditionalModel(modelInfo.path, true);
-            }
-          } catch (error) {
-            console.error('[GUI] Failed to load static model:', error);
-          }
-        } else {
-          console.warn(`[GUI] Static model ${modelName} not found in DISCOVERED_GLBS.static`);
-        }
-      } else {
-        // Unload the model completely when unchecked
-        console.log(`[GUI] Unloading static model: ${modelName}`);
-        // Only unload if it's loaded as additional model
-        removeAdditionalModel(modelName);
-      }
-    }
-  );
-    
-    modelPickersContainer.appendChild(animatedContainer);
-    modelPickersContainer.appendChild(animationContainer);
-    modelPickersContainer.appendChild(staticContainer);
-    document.body.appendChild(modelPickersContainer);
-    
-    // Apply fade behavior to the whole container
-    applyFadeBehavior(modelPickersContainer);
-  }
-  
-  // Set up callback for when animations load
-  setOnAnimationsLoaded((animationNames, defaultAnimation) => {
-    // Refresh the pickers when animations change
-    createModelPickers();
-  });
-  
-  // Create initial pickers
-  createModelPickers();
 }
 
 /**
- * Create animation picker dropdown at the top center of the screen.
- * @param {string} currentAnimation - Currently selected animation name
- * @param {string[]} animationOptions - Array of available animation names
- * @param {Function} onChange - Callback when animation changes
- * @returns {HTMLElement} The created dropdown container
- */
+* Create animation picker dropdown at the top center of the screen.
+* @param {string} currentAnimation - Currently selected animation name
+* @param {string[]} animationOptions - Array of available animation names
+* @param {Function} onChange - Callback when animation changes
+* @returns {HTMLElement} The created dropdown container
+*/
 export function createAnimationPicker(currentAnimation, animationOptions, onChange) {
   // Remove existing picker if present
   const existing = document.getElementById('animation-picker');
@@ -1232,211 +583,262 @@ export function createAnimationPicker(currentAnimation, animationOptions, onChan
 }
 
 /**
- * Remove the animation picker from the DOM.
- */
+* Remove the animation picker from the DOM.
+*/
 export function removeAnimationPicker() {
-  const picker = document.getElementById('animation-picker');
-  if (picker) picker.remove();
-  
-  // Also remove the model pickers container
-  const modelPickers = document.getElementById('model-pickers-container');
-  if (modelPickers) modelPickers.remove();
+const picker = document.getElementById('animation-picker');
+if (picker) picker.remove();
 }
 
 /**
- * Create a model dropdown with checkboxes
- * @param {string} title - Title for the dropdown
- * @param {Array<{name: string, path: string}>} models - Array of model objects
- * @param {boolean} hasCheckboxes - Whether to show checkboxes
- * @param {Function} onToggle - Callback when checkbox is toggled (modelName, isChecked)
- * @returns {HTMLElement} The created dropdown container
- */
-function createModelDropdown(title, models, hasCheckboxes, onToggle) {
-  const container = document.createElement('div');
-  container.style.cssText = `
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  `;
-  
-  // Create label
-  const label = document.createElement('label');
-  label.textContent = title;
-  label.style.cssText = `
-    color: #fff;
-    font-size: 11px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    white-space: nowrap;
-    text-align: center;
-    margin-bottom: 4px;
-  `;
-  container.appendChild(label);
-  
-  // Create dropdown button
-  const dropdownBtn = document.createElement('button');
-  dropdownBtn.textContent = `${models.length} models ▼`;
-  dropdownBtn.style.cssText = `
-    background: #333;
-    color: #fff;
-    border: 1px solid #555;
-    border-radius: 3px;
-    padding: 6px 12px;
-    font-size: 12px;
-    cursor: pointer;
-    min-width: 120px;
-    text-align: left;
-  `;
-  container.appendChild(dropdownBtn);
-  
-  // Create dropdown menu
-  const menu = document.createElement('div');
-  menu.style.cssText = `
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: #222;
-    border: 1px solid #555;
-    border-radius: 3px;
-    margin-top: 4px;
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: 300;
-    min-width: 150px;
-  `;
-  
-  // Toggle dropdown visibility
-  let isOpen = false;
-  dropdownBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    isOpen = !isOpen;
-    menu.style.display = isOpen ? 'block' : 'none';
-    dropdownBtn.textContent = `${models.length} models ${isOpen ? '▲' : '▼'}`;
-  });
-  
-  // Close dropdown when clicking outside
-  document.addEventListener('click', () => {
-    if (isOpen) {
-      isOpen = false;
-      menu.style.display = 'none';
-      dropdownBtn.textContent = `${models.length} models ▼`;
-    }
-  });
-  
-  // Populate menu with model items
-  models.forEach((model) => {
-    const item = document.createElement('div');
-    item.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 12px;
-      color: #fff;
-      font-size: 12px;
-      cursor: pointer;
-      border-bottom: 1px solid #333;
-    `;
-    
-    // Checkbox
-    if (hasCheckboxes) {
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.dataset.modelName = model.name; // Store model name for reference
-      checkbox.style.cssText = `
-        cursor: pointer;
-        width: 14px;
-        height: 14px;
-      `;
-      // Check if model is loaded AND visible
-      // Imported/uploaded models should start unchecked (not loaded yet)
-      const modelData = loadedAdditionalModels.get(model.name);
-      const modelInfo = AVAILABLE_MODELS.find(m => m.name === model.name);
-      const isImported = model.isImported || modelInfo?.isImported;
-      
-      // Default to unchecked for imported models, use visibility state for loaded models
-      if (isImported && !modelData) {
-        checkbox.checked = false; // Imported models start unchecked
-      } else {
-        checkbox.checked = modelData ? modelData.visible : false;
-      }
-      
-      // Debug logging
-      console.log(`[GUI] Checkbox for ${model.name}: checked=${checkbox.checked}, isImported=${isImported}, inLoadedMap=${!!modelData}`);
-
-      checkbox.addEventListener('change', (e) => {
-        e.stopPropagation();
-        if (onToggle) {
-          onToggle(model.name, checkbox.checked);
-        }
-      });
-
-      item.appendChild(checkbox);
-    }
-    
-    // Model name
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = model.name;
-    nameSpan.style.cssText = 'flex: 1;';
-    item.appendChild(nameSpan);
-    
-    // Animation count badge (for animated models)
-    if (model.animationCount > 0) {
-      const badge = document.createElement('span');
-      badge.textContent = `${model.animationCount} anim`;
-      badge.style.cssText = `
-        font-size: 9px;
-        color: #888;
-        background: #333;
-        padding: 1px 4px;
-        border-radius: 2px;
-      `;
-      item.appendChild(badge);
-    }
-    
-    // Hover effect
-    item.addEventListener('mouseenter', () => {
-      item.style.background = '#333';
-    });
-    item.addEventListener('mouseleave', () => {
-      item.style.background = 'transparent';
-    });
-    
-    menu.appendChild(item);
-  });
-  
-  // If no models
-  if (models.length === 0) {
-    const emptyItem = document.createElement('div');
-    emptyItem.textContent = 'No models found';
-    emptyItem.style.cssText = `
-      padding: 6px 12px;
-      color: #666;
-      font-size: 12px;
-      font-style: italic;
-    `;
-    menu.appendChild(emptyItem);
-  }
-  
-  // Position menu below dropdown
-  const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'position: relative;';
-  wrapper.appendChild(dropdownBtn);
-  wrapper.appendChild(menu);
-  container.appendChild(wrapper);
-  
-  return container;
-}
-
-/**
- * Get all setting values as a plain object.
- * @param {Object} settings - Settings object
- * @returns {Object} Plain object with setting values
- */
+* Get all setting values as a plain object.
+* @param {Object} settings - Settings object
+* @returns {Object} Plain object with setting values
+*/
 export function getSettingsValues(settings) {
     const values = {};
     for (const [key, config] of Object.entries(settings)) {
         values[key] = config.value;
     }
     return values;
+}
+
+/**
+ * Create GUI for Particle Combi scene.
+ * 
+ * @param {Object} settings - Settings object
+* @param {HTMLElement} container - Container element
+* @param {Function} onChange - Callback when settings change
+*/
+export function createCombiGUI(settings, container, onChange) {
+    console.log('[createCombiGUI] Creating Combi scene GUI');
+    
+    const handleChange = () => {
+        console.log('[createCombiGUI] Setting changed:', settings.combiShowGizmo?.label, 'new value:', settings.combiShowGizmo?.value);
+        if (onChange) onChange();
+    };
+
+    // Get toggle button
+    const toggleBtn = document.getElementById('toggle-controls');
+    
+    // Setup toggle button
+    if (toggleBtn) {
+        toggleBtn.classList.add('visible');
+        toggleBtn.textContent = 'Hide';
+        toggleBtn.onclick = () => {
+            container.classList.toggle('visible');
+            toggleBtn.textContent = container.classList.contains('visible') ? 'Hide' : 'Settings';
+        };
+    }
+    
+    // Clear existing content
+    container.innerHTML = '';
+    
+    // Transform folder
+    const transformFolder = createFolder('Transform', container);
+    
+    // Show Gizmo checkbox
+    addCheckbox(transformFolder.content, settings.combiShowGizmo, () => {
+        if (onChange) onChange();
+    });
+    
+    // Gizmo Mode selector
+    const modeSelectRow = document.createElement('div');
+    modeSelectRow.className = 'control-row';
+    modeSelectRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+    
+    const modeLabel = document.createElement('label');
+    modeLabel.textContent = settings.combiGizmoMode?.label || 'Gizmo Mode';
+    modeLabel.style.cssText = 'color: #fff; font-size: 14px;';
+    
+    const modeSelect = document.createElement('select');
+    modeSelect.style.cssText = 'background: #222; border: 1px solid #444; color: #fff; padding: 4px 8px; border-radius: 3px;';
+    
+    // Add mode options
+    const modes = ['translate', 'rotate', 'scale'];
+    modes.forEach(mode => {
+        const option = document.createElement('option');
+        option.value = mode;
+        option.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+        option.selected = settings.combiGizmoMode?.value === mode;
+        modeSelect.appendChild(option);
+    });
+    
+    modeSelect.onchange = () => {
+        settings.combiGizmoMode.value = modeSelect.value;
+        if (onChange) onChange();
+    };
+    
+    modeSelectRow.appendChild(modeLabel);
+    modeSelectRow.appendChild(modeSelect);
+    transformFolder.content.appendChild(modeSelectRow);
+    
+    // Instance count and controls
+    const instanceRow = document.createElement('div');
+    instanceRow.className = 'control-row';
+    instanceRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+    
+    const instanceLabel = document.createElement('label');
+    instanceLabel.textContent = 'Instances';
+    instanceLabel.style.cssText = 'color: #fff; font-size: 14px;';
+    
+    const instanceCount = document.createElement('span');
+    instanceCount.style.cssText = 'color: #51cf66; font-weight: bold; font-size: 14px;';
+    
+    const buttonGroup = document.createElement('div');
+    buttonGroup.style.cssText = 'display: flex; gap: 8px;';
+    
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+';
+    addBtn.style.cssText = 'background: #2b6e3f; border: none; color: #fff; width: 28px; height: 28px; border-radius: 3px; cursor: pointer; font-size: 18px; font-weight: bold;';
+    addBtn.onmouseenter = () => addBtn.style.background = '#3d8a53';
+    addBtn.onmouseleave = () => addBtn.style.background = '#2b6e3f';
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = '-';
+    removeBtn.style.cssText = 'background: #8b3a3a; border: none; color: #fff; width: 28px; height: 28px; border-radius: 3px; cursor: pointer; font-size: 18px; font-weight: bold;';
+    removeBtn.onmouseenter = () => removeBtn.style.background = '#a64d4d';
+    removeBtn.onmouseleave = () => removeBtn.style.background = '#8b3a3a';
+    
+    // Update count display
+    const updateCount = () => {
+        import('../scenes/combi.js').then(module => {
+            const count = module.getCombiEmitterCount ? module.getCombiEmitterCount() : 0;
+            instanceCount.textContent = `${count}/3`;
+            addBtn.disabled = count >= 3;
+            removeBtn.disabled = count <= 1;
+            addBtn.style.opacity = count >= 3 ? '0.5' : '1';
+            removeBtn.style.opacity = count <= 1 ? '0.5' : '1';
+        });
+    };
+    
+    addBtn.onclick = () => {
+        import('../scenes/combi.js').then(module => {
+            if (module.addCombiEmitter && module.addCombiEmitter()) {
+                updateCount();
+                populateInstanceSelect();
+            }
+        });
+    };
+    
+    removeBtn.onclick = () => {
+        import('../scenes/combi.js').then(module => {
+            if (module.removeCombiEmitter && module.removeCombiEmitter()) {
+                updateCount();
+                populateInstanceSelect();
+            }
+        });
+    };
+    
+    buttonGroup.appendChild(removeBtn);
+    buttonGroup.appendChild(instanceCount);
+    buttonGroup.appendChild(addBtn);
+    
+    instanceRow.appendChild(instanceLabel);
+    instanceRow.appendChild(buttonGroup);
+    transformFolder.content.appendChild(instanceRow);
+    
+    // Instance selector dropdown
+    const instanceSelectRow = document.createElement('div');
+    instanceSelectRow.className = 'control-row';
+    instanceSelectRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+    
+    const selectLabel = document.createElement('label');
+    selectLabel.textContent = 'Select Instance';
+    selectLabel.style.cssText = 'color: #fff; font-size: 14px;';
+    
+    const instanceSelect = document.createElement('select');
+    instanceSelect.style.cssText = 'background: #222; border: 1px solid #444; color: #fff; padding: 4px 8px; border-radius: 3px; flex: 1; margin-left: 8px;';
+    
+    // Function to populate instance dropdown
+    const populateInstanceSelect = () => {
+        instanceSelect.innerHTML = '';
+        import('../scenes/combi.js').then(module => {
+            const instanceIds = module.getCombiInstanceIds ? module.getCombiInstanceIds() : [];
+            const selected = module.getCombiSelectedInstance ? module.getCombiSelectedInstance() : null;
+            
+            instanceIds.forEach((id, idx) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = `Emitter ${idx + 1}`;
+                option.selected = id === selected;
+                instanceSelect.appendChild(option);
+            });
+            
+            if (instanceIds.length === 0) {
+                const option = document.createElement('option');
+                option.textContent = 'No instances';
+                instanceSelect.appendChild(option);
+                instanceSelect.disabled = true;
+            } else {
+                instanceSelect.disabled = false;
+            }
+        });
+    };
+    
+    instanceSelect.onchange = () => {
+        import('../scenes/combi.js').then(module => {
+            if (module.selectCombiInstance) {
+                module.selectCombiInstance(instanceSelect.value);
+            }
+        });
+    };
+    
+    instanceSelectRow.appendChild(selectLabel);
+    instanceSelectRow.appendChild(instanceSelect);
+    transformFolder.content.appendChild(instanceSelectRow);
+    
+    // Reset buttons
+    const resetRow = document.createElement('div');
+    resetRow.className = 'control-row';
+    resetRow.style.cssText = 'display: flex; gap: 8px; padding: 12px 0; flex-wrap: wrap;';
+    
+    function createResetButton(label, onClick) {
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.style.cssText = `
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            flex: 1;
+            min-width: 60px;
+        `;
+        btn.onmouseenter = () => btn.style.background = '#444';
+        btn.onmouseleave = () => btn.style.background = '#333';
+        btn.onclick = () => {
+            import('../scenes/combi.js').then(module => {
+                onClick(module);
+            });
+        };
+        return btn;
+    }
+    
+    resetRow.appendChild(createResetButton('Reset Pos', (m) => m.resetCombiPosition && m.resetCombiPosition()));
+    resetRow.appendChild(createResetButton('Reset Rot', (m) => m.resetCombiRotation && m.resetCombiRotation()));
+    resetRow.appendChild(createResetButton('Reset Scale', (m) => m.resetCombiScale && m.resetCombiScale()));
+    resetRow.appendChild(createResetButton('Reset All', (m) => m.resetCombiAll && m.resetCombiAll()));
+    
+    transformFolder.content.appendChild(resetRow);
+    
+    // Auto-rotate off checkbox
+    addCheckbox(transformFolder.content, settings.combiAutoRotateOff, () => {
+        if (onChange) onChange();
+    });
+    
+    // Initial updates
+    setTimeout(() => {
+        updateCount();
+        populateInstanceSelect();
+    }, 100);
+    
+    container.classList.add('visible');
+
+    // Apply fade behavior to settings panel
+    applyFadeBehavior(container);
+    
+    console.log('[createCombiGUI] Combi GUI creation complete');
 }

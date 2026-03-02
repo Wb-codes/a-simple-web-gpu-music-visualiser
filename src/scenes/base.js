@@ -216,32 +216,30 @@ export function createInstancedStorageBuffer(count, itemSize) {
 }
 
 /**
- * Standard scene camera positions by scene type.
- * @constant {Object.<string, THREE.Vector3>}
- */
+* Standard scene camera positions by scene type.
+* @constant {Object.<string, THREE.Vector3>}
+*/
 export const SCENE_CAMERA_POSITIONS = {
-    particles: new THREE.Vector3(0, 0, 15),
-    points: new THREE.Vector3(-40, 0, 60),
-    skinning: new THREE.Vector3(0, 300, -85)
+particles: new THREE.Vector3(0, 0, 15),
+skinning: new THREE.Vector3(0, 300, -85)
 };
 
 /**
- * Standard scene camera targets by scene type.
- * @constant {Object.<string, THREE.Vector3>}
- */
+* Standard scene camera targets by scene type.
+* @constant {Object.<string, THREE.Vector3>}
+*/
 export const SCENE_CAMERA_TARGETS = {
-    particles: new THREE.Vector3(0, 0, 0),
-    points: new THREE.Vector3(0, 0, 0),
-    skinning: new THREE.Vector3(0, 0, -85)
+particles: new THREE.Vector3(0, 0, 0),
+skinning: new THREE.Vector3(0, 0, -85)
 };
 
 /**
- * Position camera for a specific scene type.
- * 
- * @param {THREE.PerspectiveCamera} camera - The camera
- * @param {OrbitControls} controls - The controls
- * @param {string} sceneType - Scene type ('particles', 'points', 'skinning')
- */
+* Position camera for a specific scene type.
+*
+* @param {THREE.PerspectiveCamera} camera - The camera
+* @param {OrbitControls} controls - The controls
+* @param {string} sceneType - Scene type ('particles', 'skinning')
+*/
 export function positionCameraForScene(camera, controls, sceneType) {
     const position = SCENE_CAMERA_POSITIONS[sceneType];
     const target = SCENE_CAMERA_TARGETS[sceneType];

@@ -1,8 +1,8 @@
 /**
- * @module audio/capture
- * @description Audio capture and analysis for both browser and Electron modes.
- * Handles device enumeration, audio source selection, and frequency analysis.
- */
+* @module audio/capture
+* @description Audio capture and analysis for browser mode.
+* Handles device enumeration, audio source selection, and frequency analysis.
+*/
 
 import { audioBass, audioMid, audioHigh, audioOverall, updateAudioUniforms } from './uniforms.js';
 import { showAudioSourceSelector as showAudioSelector, setAudioConnecting, setAudioActive, setAudioError, setAudioSelectScreen } from '../gui/audio-selector.js';
@@ -23,82 +23,59 @@ let audioSources = [];
 let selectedAudioSource = null;
 
 /**
- * Check if audio is currently active.
- * @returns {boolean}
- */
+* Check if audio is currently active.
+* @returns {boolean}
+*/
 export function isAudioActive() {
-    return analyser !== null && dataArray !== null;
+return analyser !== null && dataArray !== null;
 }
 
 /**
- * Get available audio sources (Electron mode).
- * @returns {Array<{id: string, name: string, thumbnail: string}>}
- */
+* Get available audio sources.
+* @returns {Array<{id: string, name: string, thumbnail: string}>}
+*/
 export function getAudioSources() {
-    return audioSources;
+return audioSources;
 }
 
 /**
- * Get the currently selected audio source.
- * @returns {{id: string, name: string, thumbnail: string}|null}
- */
+* Get the currently selected audio source.
+* @returns {{id: string, name: string, thumbnail: string}|null}
+*/
 export function getSelectedAudioSource() {
-    return selectedAudioSource;
+return selectedAudioSource;
 }
 
 /**
- * Initialize audio capture.
- * Shows device selector in browser, source selector in Electron.
- * Auto-detects OBS Browser Source and uses dummy audio to avoid permission dialogs.
- * @returns {Promise<boolean>} True if audio initialized successfully
- */
+* Initialize audio capture.
+* Shows device selector in browser.
+* Auto-detects OBS Browser Source and uses dummy audio to avoid permission dialogs.
+* @returns {Promise<boolean>} True if audio initialized successfully
+*/
 export async function initAudio() {
   try {
     // Check for dummy audio mode (OBS Browser Source or URL parameter)
     const urlParams = new URLSearchParams(window.location.search);
     const useDummyAudio = urlParams.get('audio') === 'dummy' || isOBSBrowserSource();
     
-    if (useDummyAudio) {
-      console.log('[Audio] Dummy audio mode detected - using synthetic audio');
-      return initDummyAudio();
-    }
-    
-    // Normal audio initialization
-    if (window.isElectron && window.electronAPI) {
-      return initElectronAudio();
-    } else {
-      return initBrowserAudio();
-    }
-  } catch (err) {
-    console.error('Audio error:', err);
-    handleAudioError(err);
-    return false;
-  }
+	if (useDummyAudio) {
+		console.log('[Audio] Dummy audio mode detected - using synthetic audio');
+		return initDummyAudio();
+	}
+
+	// Browser audio initialization
+	return initBrowserAudio();
+} catch (err) {
+	console.error('Audio error:', err);
+	handleAudioError(err);
+	return false;
+}
 }
 
 /**
- * Initialize audio in Electron mode with source selector.
- * @param {HTMLElement} statusEl - Status display element
- * @returns {Promise<boolean>}
- */
-async function initElectronAudio() {
-    const sources = await window.electronAPI.getAudioSources();
-    audioSources = sources.filter(s => s.name && !s.name.includes('Music Visualizer'));
-    
-    if (audioSources.length === 0) {
-        setAudioError('No sources found');
-        return false;
-    }
-    
-    showAudioSourceSelector();
-    return true;
-}
-
-/**
- * Initialize audio in browser mode with screen share.
- * @param {HTMLElement} statusEl - Status display element
- * @returns {Promise<boolean>}
- */
+* Initialize audio in browser mode with screen share.
+* @returns {Promise<boolean>}
+*/
 async function initBrowserAudio() {
     setAudioSelectScreen();
     
@@ -149,9 +126,9 @@ function setupAudioContext(audioTrack) {
 }
 
 /**
- * Show audio source selector UI (Electron mode).
- * Prevents duplicate selectors from being shown.
- */
+* Show audio source selector UI.
+* Prevents duplicate selectors from being shown.
+*/
 let isAudioSelectorShowing = false;
 
 function showAudioSourceSelector() {
@@ -177,66 +154,41 @@ function showAudioSourceSelector() {
 }
 
 /**
- * Select and connect to an audio source (Electron mode).
- * @param {{id: string, name: string, thumbnail: string}} source - The audio source to connect to
- * @returns {Promise<boolean>}
- */
+* Select and connect to an audio source.
+* @param {{id: string, name: string, thumbnail: string}} source - The audio source to connect to
+* @returns {Promise<boolean>}
+*/
 export async function selectAudioSource(source) {
-  const selector = document.getElementById('audio-selector');
-  if (selector) selector.remove();
-  
-  // Reset the flag when selector is removed
-  isAudioSelectorShowing = false;
-  
-  setAudioConnecting();
-    
-    try {
-        let audioTrack = null;
-        
-        if (window.electronAPI) {
-            const constraints = {
-                audio: {
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: source.id
-                    }
-                },
-                video: {
-                    mandatory: {
-                        chromeMediaSource: 'desktop',
-                        chromeMediaSourceId: source.id,
-                        maxWidth: 1,
-                        maxHeight: 1
-                    }
-                }
-            };
-            
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            audioTrack = stream.getAudioTracks()[0];
-            stream.getVideoTracks().forEach(t => t.stop());
-        } else {
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-            audioTrack = stream.getAudioTracks()[0];
-            stream.getVideoTracks().forEach(t => t.stop());
-        }
-        
-        if (!audioTrack) {
-            setAudioError('No audio track');
-            return false;
-        }
-        
-        setupAudioContext(audioTrack);
-        
-        selectedAudioSource = source;
-        setAudioActive(source.name);
-        
-        return true;
-    } catch (err) {
-        console.error('Audio connection error:', err);
-        statusEl.textContent = 'Audio: ' + err.message;
-        statusEl.className = 'error';
-        return false;
-    }
+	const selector = document.getElementById('audio-selector');
+	if (selector) selector.remove();
+
+	// Reset the flag when selector is removed
+	isAudioSelectorShowing = false;
+
+	setAudioConnecting();
+
+	try {
+		let audioTrack = null;
+
+		const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+		audioTrack = stream.getAudioTracks()[0];
+		stream.getVideoTracks().forEach(t => t.stop());
+
+		if (!audioTrack) {
+			setAudioError('No audio track');
+			return false;
+		}
+
+		setupAudioContext(audioTrack);
+
+		selectedAudioSource = source;
+		setAudioActive(source.name);
+
+		return true;
+	} catch (err) {
+		console.error('Audio connection error:', err);
+		return false;
+	}
 }
 
 /**
@@ -296,16 +248,19 @@ function handleAudioError(err) {
 }
 
 /**
- * Close audio context and cleanup.
- */
+* Close audio context and cleanup.
+*/
 export function closeAudio() {
-    if (audioContext) {
-        audioContext.close();
-        audioContext = null;
-    }
-    analyser = null;
-    dataArray = null;
-    selectedAudioSource = null;
+	// Cleanup dummy audio oscillators first
+	cleanupDummyAudio();
+
+	if (audioContext) {
+		audioContext.close();
+		audioContext = null;
+	}
+	analyser = null;
+	dataArray = null;
+	selectedAudioSource = null;
 }
 
 /**

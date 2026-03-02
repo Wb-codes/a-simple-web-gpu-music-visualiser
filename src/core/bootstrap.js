@@ -1,8 +1,7 @@
 /**
- * @module core/bootstrap
- * @description Shared application initialization for both browser and Electron versions.
- * Provides common setup logic that works across all entry points.
- */
+* @module core/bootstrap
+* @description Shared application initialization for the music visualizer.
+*/
 
 import WebGPU from 'three/addons/capabilities/WebGPU.js';
 import { initRenderer, setupPostProcessing, updateBloom, updateControls, resetCamera, onWindowResize, getRenderer, getCamera, getControls, setAnimationLoop, render } from './renderer.js';
@@ -25,23 +24,12 @@ const appState = {
 };
 
 /**
- * Initialize the visualization application.
- * Works for both browser and Electron versions.
- * 
- * @param {Object} options - Initialization options
- * @param {Object} options.settings - Settings object
- * @param {string} options.sceneType - Scene type to initialize ('particles', 'points', 'skinning')
- * @param {Object} [options.rendererConfig] - Renderer configuration
- * @param {number} [options.rendererConfig.width] - Canvas width
- * @param {number} [options.rendererConfig.height] - Canvas height
- * @param {boolean} [options.rendererConfig.autoRotate] - Enable auto rotation
- * @param {number} [options.rendererConfig.autoRotateSpeed] - Rotation speed
- * @param {Function} [options.onSettingsChange] - Callback when settings change
- * @param {Function} [options.onAudioUpdate] - Callback when audio updates
- * @param {Function} [options.onRender] - Callback before each render
- * @returns {Promise<{scene: THREE.Scene, cleanup: Function}>}
- * @throws {Error} If WebGPU is not available
- */
+* Initialize the visualization with a specific scene.
+* @param {Object} options - Configuration options
+* @param {Object} options.settings - Settings object
+* @param {string} options.sceneType - Scene type to initialize
+* @returns {Promise<{scene: THREE.Scene, cleanup: Function}>}
+*/
 export async function initVisualization(options) {
   const { settings, sceneType, rendererConfig = {}, onSettingsChange, onAudioUpdate, onRender } = options;
 

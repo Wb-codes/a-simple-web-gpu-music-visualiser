@@ -1,14 +1,14 @@
 /**
- * @module gui/audio-selector
- * @description Audio source selector UI for Electron mode.
- * Provides a modal dialog for selecting audio sources.
- */
+* @module gui/audio-selector
+* @description Audio source selector UI.
+* Provides a modal dialog for selecting audio sources.
+*/
 
 /**
- * Show audio source selector UI (Electron mode).
- * @param {Array<{id: string, name: string, thumbnail: string}>} audioSources - Available audio sources
- * @param {Function} onSelect - Callback when a source is selected
- */
+* Show audio source selector UI.
+* @param {Array<{id: string, name: string, thumbnail: string}>} audioSources - Available audio sources
+* @param {Function} onSelect - Callback when a source is selected
+*/
 export function showAudioSourceSelector(audioSources, onSelect) {
     let selector = document.getElementById('audio-selector');
     if (!selector) {

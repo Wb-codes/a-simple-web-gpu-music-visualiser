@@ -23,3 +23,12 @@ docker/
 CHANGES_SUMMARY.txt
 Dockerfile.opencode
 musicvis.app
+
+.env
+.env.*
+*.pem
+*.key
+.npmrc
+.yarnrc
+.git
+.github

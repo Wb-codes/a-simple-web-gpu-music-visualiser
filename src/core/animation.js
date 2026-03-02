@@ -92,51 +92,46 @@ export function resetClock() {
  * Returns a function suitable for passing to renderer.setAnimationLoop().
  * @param {Object} options - Animation options
  * @param {Function} [options.update] - Update callback (delta, state) => void
- * @param {Function} [options.render] - Render callback () => void
- * @param {Function} [options.updateAudio] - Audio update callback () => void
- * @param {Function} [options.updateBloom] - Bloom update callback () => void
- * @param {Function} [options.updateControls] - Controls update callback () => void
- * @param {Function} [options.updateScene] - Scene update callback (delta, sceneType) => void
- * @param {Function} [options.syncToSpout] - Spout sync callback () => void
- * @returns {Function} Animation loop function
- */
+* @param {Function} [options.render] - Render callback () => void
+* @param {Function} [options.updateAudio] - Audio update callback () => void
+* @param {Function} [options.updateBloom] - Bloom update callback () => void
+* @param {Function} [options.updateControls] - Controls update callback () => void
+* @param {Function} [options.updateScene] - Scene update callback (delta, sceneType) => void
+* @returns {Function} Animation loop function
+*/
 export function createAnimationLoop(options = {}) {
-    const {
-        update,
-        render,
-        updateAudio,
-        updateBloom,
-        updateControls,
-        updateScene,
-        syncToSpout,
-        getSceneType
-    } = options;
+const {
+update,
+render,
+updateAudio,
+updateBloom,
+updateControls,
+updateScene,
+getSceneType
+} = options;
 
-    return function animationLoop() {
-        const delta = clock.getDelta();
-        frameCount++;
+return function animationLoop() {
+const delta = clock.getDelta();
+frameCount++;
 
-        // Update audio analysis
-        if (updateAudio) updateAudio();
+// Update audio analysis
+if (updateAudio) updateAudio();
 
-        // Update bloom effects
-        if (updateBloom) updateBloom();
+// Update bloom effects
+if (updateBloom) updateBloom();
 
-        // Update camera controls
-        if (updateControls) updateControls();
+// Update camera controls
+if (updateControls) updateControls();
 
-        // Update current scene
-        if (updateScene && getSceneType) {
-            updateScene(delta, getSceneType());
-        }
+// Update current scene
+if (updateScene && getSceneType) {
+updateScene(delta, getSceneType());
+}
 
-        // Custom update callback
-        if (update) update(delta, getAnimationState());
+// Custom update callback
+if (update) update(delta, getAnimationState());
 
-        // Sync to Spout window
-        if (syncToSpout) syncToSpout();
-
-        // Render frame
-        if (render) render();
-    };
+// Render frame
+if (render) render();
+};
 }

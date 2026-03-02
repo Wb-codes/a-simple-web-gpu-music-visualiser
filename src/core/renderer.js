@@ -147,13 +147,12 @@ export async function initRenderer(options = {}) {
       border-radius: 10px; font-family: sans-serif; z-index: 10000;
       max-width: 80%; text-align: center;
     `;
-    errorDiv.innerHTML = `
-      <h3>WebGPU Initialization Failed</h3>
-      <p>Error: ${err.message}</p>
-      <p>User Agent: ${navigator.userAgent}</p>
-      <p>This may be due to CEF/OBS Browser Source restrictions.</p>
-      <p>Try using Electron app with Spout output instead.</p>
-    `;
+		errorDiv.innerHTML = `
+<h3>WebGPU Initialization Failed</h3>
+<p>Error: ${err.message}</p>
+<p>User Agent: ${navigator.userAgent}</p>
+<p>This may be due to browser restrictions.</p>
+`;
     document.body.appendChild(errorDiv);
     
     throw err;
@@ -301,9 +300,44 @@ export function render() {
 }
 
 /**
- * Get the post-processing instance.
- * @returns {THREE.PostProcessing|null}
- */
+* Get the post-processing instance.
+* @returns {THREE.PostProcessing|null}
+*/
 export function getPostProcessing() {
-    return postProcessing;
+	return postProcessing;
+}
+
+/**
+* Dispose of all renderer resources.
+* Call this when shutting down the application.
+*/
+export function disposeRenderer() {
+	// Stop animation loop
+	if (renderer) {
+		renderer.setAnimationLoop(null);
+	}
+
+	// Dispose post-processing
+	if (postProcessing) {
+		postProcessing.dispose?.();
+		postProcessing = null;
+	}
+	bloomPass = null;
+
+	// Dispose controls
+	if (controls) {
+		controls.dispose();
+		controls = null;
+	}
+
+	// Dispose renderer
+	if (renderer) {
+		renderer.dispose();
+		renderer = null;
+	}
+
+	camera = null;
+	isInitialized = false;
+
+	console.log('[Renderer] Disposed all resources');
 }
