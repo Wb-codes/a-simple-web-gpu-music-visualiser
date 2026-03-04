@@ -101,33 +101,32 @@ export const ANIMATION_NAMES = Object.keys(ANIMATION_MAP);
 export let CURRENT_MODEL_PATH = null;
 
 /**
- * Build animation map from GLB animation clips
- * Automatically detects animation naming patterns and creates clean names
- * @param {Array<THREE.AnimationClip>} animations - Animation clips from GLB
- * @param {string} modelPath - Path to the loaded model
- * @returns {Object} Object containing map, names array, and default animation
- */
+* Build animation map from GLB animation clips
+* Automatically detects animation naming patterns and creates clean names
+* @param {Array<THREE.AnimationClip>} animations - Animation clips from GLB
+* @param {string} modelPath - Path to the loaded model
+* @returns {Object} Object containing map, names array, and default animation
+*/
 export function buildAnimationMapFromGLB(animations, modelPath) {
-  const map = {};
-  
-  animations.forEach(clip => {
-    // Extract clean name from various formats
-    const cleanName = extractAnimationName(clip.name);
-    map[cleanName] = clip.name;
-  });
-  
-  DYNAMIC_ANIMATION_MAP = map;
-  DYNAMIC_ANIMATION_NAMES = Object.keys(map).sort();
-  DEFAULT_ANIMATION = DYNAMIC_ANIMATION_NAMES[0] || '';
-  CURRENT_MODEL_PATH = modelPath;
-  
-  console.log('Dynamic animations detected:', DYNAMIC_ANIMATION_NAMES);
-  
-  return {
-    map,
-    names: DYNAMIC_ANIMATION_NAMES,
-    defaultAnimation: DEFAULT_ANIMATION
-  };
+const map = {};
+
+animations.forEach(clip => {
+const cleanName = extractAnimationName(clip.name);
+map[cleanName] = clip.name;
+});
+
+const names = Object.keys(map).sort();
+const defaultAnimation = names[0] || '';
+
+CURRENT_MODEL_PATH = modelPath;
+
+console.log('[Animations] Detected for', modelPath, ':', names);
+
+return {
+map,
+names,
+defaultAnimation
+};
 }
 
 /**

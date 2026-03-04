@@ -97,7 +97,7 @@ export async function initRenderer(options = {}) {
     console.log('[Renderer] Creating camera...');
     // Create camera
     camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 10000);
-    camera.position.set(0, 0, 15);
+    camera.position.set(0, 0, 10);
     console.log('[Renderer] Camera created');
 
     console.log('[Renderer] Creating WebGPU renderer...');
@@ -116,11 +116,12 @@ export async function initRenderer(options = {}) {
 
     console.log('[Renderer] Creating OrbitControls...');
     // Create controls
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.autoRotate = autoRotate;
-    controls.autoRotateSpeed = autoRotateSpeed;
-    controls.maxDistance = 200;
+controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.autoRotate = autoRotate;
+controls.autoRotateSpeed = autoRotateSpeed;
+controls.maxDistance = 5000;
+controls.minDistance = 10;
     console.log('[Renderer] Controls created');
 
     isInitialized = true;
@@ -169,14 +170,42 @@ export async function initRenderer(options = {}) {
  * @returns {THREE.PostProcessing}
  */
 export function setupPostProcessing(scene, bloomConfig = {}) {
-    const { strength = 0.75, threshold = 0.1, radius = 0.5 } = bloomConfig;
+const { strength = 0.75, threshold = 0.1, radius = 0.5 } = bloomConfig;
 
-    const scenePass = pass(scene, camera);
-    const scenePassColor = scenePass.getTextureNode('output');
-    bloomPass = bloom(scenePassColor, strength, threshold, radius);
-    postProcessing = new THREE.PostProcessing(renderer, scenePassColor.add(bloomPass));
+const scenePass = pass(scene, camera);
+const scenePassColor = scenePass.getTextureNode('output');
+bloomPass = bloom(scenePassColor, strength, threshold, radius);
+postProcessing = new THREE.PostProcessing(renderer, scenePassColor.add(bloomPass));
 
-    return postProcessing;
+return postProcessing;
+}
+
+/**
+* Update the scene in post-processing (for dynamic scene switching).
+* @param {THREE.Scene} scene - The new scene to render
+* @param {Object} [bloomConfig] - Optional bloom configuration
+* @returns {THREE.PostProcessing}
+*/
+export function updatePostProcessingScene(scene, bloomConfig = {}) {
+if (!renderer || !camera) return null;
+
+const { strength, threshold, radius } = bloomConfig;
+const config = {
+strength: strength ?? bloomPass?.strength?.value ?? 0.75,
+threshold: threshold ?? bloomPass?.threshold?.value ?? 0.1,
+radius: radius ?? bloomPass?.radius?.value ?? 0.5
+};
+
+if (postProcessing) {
+postProcessing.dispose?.();
+}
+
+const scenePass = pass(scene, camera);
+const scenePassColor = scenePass.getTextureNode('output');
+bloomPass = bloom(scenePassColor, config.strength, config.threshold, config.radius);
+postProcessing = new THREE.PostProcessing(renderer, scenePassColor.add(bloomPass));
+
+return postProcessing;
 }
 
 /**

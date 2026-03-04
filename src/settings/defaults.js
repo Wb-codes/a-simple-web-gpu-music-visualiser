@@ -101,31 +101,126 @@ export const defaultSettings = {
   /** Camera rotation speed (negative for reverse) */
   autoRotateSpeed: { value: 2, min: -10, max: 10, label: "Rotate Speed" },
 
-  // === Skinning Scene Animation ===
-  /** Current animation for skinning scene (options populated at runtime) */
-  currentAnimation: { value: "DanceLoop", label: "Animation", options: [] },
+// === Skinning Scene Animation ===
+/** Current animation for skinning scene (options populated at runtime) */
+currentAnimation: { value: "DanceLoop", label: "Animation", options: [] },
 
-  // === Output ===
+// === Skinning Point Size ===
+/** Base point size for skinning scene */
+pointSize: { value: 5, min: 1, max: 20, label: "Point Size" },
+/** Audio reactivity for point size */
+pointSizeAudio: { value: 5, min: 0, max: 20, label: "Audio Size" },
+
+// === Output ===
     /** Enable green screen background for OBS chroma key */
     greenScreen: { value: false, label: "Green Screen" },
     
-	// === Combi Scene ===
-	/** Show transform gizmo in combi scene */
-	combiShowGizmo: { value: false, label: "Show Gizmo" },
-	/** Turn off camera auto-rotate in combi scene */
-	combiAutoRotateOff: { value: false, label: "Stop Auto-Rotate" },
-	/** Gizmo transform mode: translate, rotate, or scale */
-	combiGizmoMode: { value: "translate", options: ["translate", "rotate", "scale"], label: "Gizmo Mode" }
+// === Combi Scene ===
+/** Show transform gizmo in combi scene */
+combiShowGizmo: { value: false, label: "Show Gizmo" },
+/** Turn off camera auto-rotate in combi scene */
+combiAutoRotateOff: { value: false, label: "Stop Auto-Rotate" },
+/** Gizmo transform mode: translate, rotate, or scale */
+combiGizmoMode: { value: "translate", options: ["translate", "rotate", "scale"], label: "Gizmo Mode" },
+/** Instance count for combi scene */
+combiInstanceCount: { value: 1, min: 1, max: 3, label: "Instances" },
+/** Stored transforms for each instance (serialized as arrays) */
+combiInstanceTransforms: { value: [], label: "Instance Transforms" }
 };
 
+const STORAGE_KEY = 'music_visualizer_settings';
+
 /**
- * Create a reactive settings object from defaults.
- * @returns {Object} Settings object with reactive values
- */
+* Save settings to localStorage
+* @param {Object} settings - Settings object to save
+*/
+export function saveSettings(settings) {
+try {
+const values = {};
+for (const [key, config] of Object.entries(settings)) {
+values[key] = config.value;
+}
+localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
+} catch (e) {
+console.warn('[Settings] Failed to save:', e);
+}
+}
+
+/**
+* Load settings from localStorage
+* @param {Object} settings - Settings object to restore into
+*/
+export function loadSettings(settings) {
+try {
+const saved = localStorage.getItem(STORAGE_KEY);
+if (!saved) return;
+
+const values = JSON.parse(saved);
+for (const [key, value] of Object.entries(values)) {
+if (settings[key] && settings[key].value !== undefined) {
+settings[key].value = value;
+}
+}
+console.log('[Settings] Restored from localStorage');
+} catch (e) {
+console.warn('[Settings] Failed to load:', e);
+}
+}
+
+/**
+* Create a reactive settings object from defaults.
+* @returns {Object} Settings object with reactive values
+*/
 export function createSettings() {
-    const settings = {};
-    for (const [key, config] of Object.entries(defaultSettings)) {
-        settings[key] = { ...config };
-    }
-    return settings;
+const settings = {};
+for (const [key, config] of Object.entries(defaultSettings)) {
+settings[key] = { ...config };
+}
+loadSettings(settings);
+return settings;
+}
+
+/**
+* Reset settings to default values (does not clear localStorage)
+* @param {Object} settings - Settings object to reset
+*/
+export function resetToDefaults(settings) {
+for (const [key, config] of Object.entries(defaultSettings)) {
+if (settings[key]) {
+settings[key].value = config.value;
+}
+}
+console.log('[Settings] Reset to defaults');
+}
+
+/**
+* Clear all saved settings from localStorage
+*/
+export function clearSavedSettings() {
+try {
+localStorage.removeItem(STORAGE_KEY);
+localStorage.removeItem('music_visualizer_scene');
+console.log('[Settings] Cleared saved settings from localStorage');
+} catch (e) {
+console.warn('[Settings] Failed to clear:', e);
+}
+}
+
+/**
+* Save and confirm
+* @param {Object} settings - Settings to save
+*/
+export function saveAndConfirm(settings) {
+saveSettings(settings);
+console.log('[Settings] Saved current state');
+}
+
+/**
+* Reset everything to defaults and clear storage
+* @param {Object} settings - Settings object to reset
+*/
+export function fullReset(settings) {
+clearSavedSettings();
+resetToDefaults(settings);
+console.log('[Settings] Full reset complete');
 }

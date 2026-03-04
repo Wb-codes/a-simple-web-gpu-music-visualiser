@@ -138,28 +138,28 @@ function animate() {
     const renderer = getRenderer();
     const settings = appState.settings;
 
-  if (!settings) return;
+if (!settings) return;
 
-  // Get audio data - analyze locally, uniforms are automatically updated for shaders
-  const audioData = analyzeAudio(settings);
-    
-    // Notify audio update callback
-    if (appState.onAudioUpdate) {
-        appState.onAudioUpdate(audioData);
-    }
-    
-    // Calculate audio-reactive bloom
-    const bloomStrength = settings.bloomIntensity.value + 
-        (audioData.bass * settings.bloomBass.value) +
-        (audioData.mid * settings.bloomMid.value) +
-        (audioData.high * settings.bloomHigh.value);
-    
-    // Update bloom
-    updateBloom({
-        strength: bloomStrength,
-        threshold: settings.bloomThreshold.value,
-        radius: settings.bloomRadius.value
-    });
+// Get audio data - analyze locally, uniforms are automatically updated for shaders
+const audioData = analyzeAudio(settings);
+
+// Notify audio update callback
+if (appState.onAudioUpdate) {
+appState.onAudioUpdate(audioData);
+}
+
+// Calculate audio-reactive bloom (used across all scenes)
+const bloomStrength = settings.bloomIntensity.value +
+(audioData.bass * settings.bloomBass.value) +
+(audioData.mid * settings.bloomMid.value) +
+(audioData.high * settings.bloomHigh.value);
+
+// Update bloom
+updateBloom({
+strength: bloomStrength,
+threshold: settings.bloomThreshold.value,
+radius: settings.bloomRadius.value
+});
     
     // Update controls
     updateControls({

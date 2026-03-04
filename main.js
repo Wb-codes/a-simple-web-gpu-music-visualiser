@@ -12,13 +12,20 @@ import { initVisualization, stopAnimation } from './src/core/bootstrap.js';
 import { initAudio, analyzeAudio, isAudioActive } from './src/audio/capture.js';
 import { createParticlesGUI, createSkinningGUI, createCombiGUI, createSceneSelector, updateSceneSelector, removeAnimationPicker, removeAllFadeBehaviors } from './src/gui/index.js';
 import { applyFadeToSettingsButton, applyFadeBehavior } from './src/gui/fade-manager.js';
-import { createSettings } from './src/settings/defaults.js';
+import { createSettings, saveSettings } from './src/settings/defaults.js';
 
 // === State ===
 const settings = createSettings();
 let app = null;
-let currentSceneType = 'particles';
+let currentSceneType = localStorage.getItem('music_visualizer_scene') || 'particles';
 let audioInitialized = false;
+
+// Auto-save settings when they change
+let saveTimeout = null;
+const scheduleSave = () => {
+if (saveTimeout) clearTimeout(saveTimeout);
+saveTimeout = setTimeout(() => saveSettings(settings), 500);
+};
 
 /**
 * Initialize the application with scene.
@@ -27,6 +34,7 @@ let audioInitialized = false;
 async function init(sceneType) {
 console.log('[Main] Initializing scene:', sceneType);
 currentSceneType = sceneType;
+localStorage.setItem('music_visualizer_scene', sceneType);
 
 try {
 // Initialize visualization
@@ -37,18 +45,24 @@ sceneType
 });
 console.log('[Main] initVisualization completed successfully');
 
-	// Create scene-specific GUI
-	const container = document.getElementById('controls');
+// Create scene-specific GUI
+const container = document.getElementById('controls');
 
-	if (sceneType === 'particles') {
-		createParticlesGUI(settings, container);
-	} else if (sceneType === 'skinning') {
-		createSkinningGUI(settings, container);
-	} else if (sceneType === 'combi') {
-		createCombiGUI(settings, container);
-	}
+const onChange = scheduleSave;
 
-	// Hide scene indicator (using dropdown instead)
+switch (sceneType) {
+case 'particles':
+createParticlesGUI(settings, container, onChange);
+break;
+case 'skinning':
+createSkinningGUI(settings, container, onChange);
+break;
+case 'combi':
+createCombiGUI(settings, container, onChange);
+break;
+}
+
+// Hide scene indicator (using dropdown instead)
 	const indicator = document.getElementById('scene-indicator');
 if (indicator) {
 indicator.style.display = 'none';
@@ -99,12 +113,27 @@ if (sceneType === currentSceneType) return;
 
 console.log('Switching scene from', currentSceneType, 'to', sceneType);
 
+// Save combi state before switching away
+if (currentSceneType === 'combi') {
+const { getCombiTransforms, getCombiInstanceCount } = await import('./src/scenes/combi.js');
+if (getCombiTransforms) {
+settings.combiInstanceTransforms.value = getCombiTransforms();
+}
+if (getCombiInstanceCount) {
+settings.combiInstanceCount.value = getCombiInstanceCount();
+}
+}
+
+// Save current settings before switching
+saveSettings(settings);
+
 // Remove animation picker when leaving skinning scene
 if (currentSceneType === 'skinning') {
 removeAnimationPicker();
 }
 
 currentSceneType = sceneType;
+localStorage.setItem('music_visualizer_scene', sceneType);
 
 // Stop current animation
 stopAnimation();
@@ -126,19 +155,25 @@ settings,
 sceneType
 });
 
-	// Create scene-specific GUI
-	const container = document.getElementById('controls');
+// Create scene-specific GUI
+const container = document.getElementById('controls');
 
-	if (sceneType === 'particles') {
-		createParticlesGUI(settings, container);
-	} else if (sceneType === 'skinning') {
-		createSkinningGUI(settings, container);
-	} else if (sceneType === 'combi') {
-		createCombiGUI(settings, container);
-	}
+const onChange = scheduleSave;
 
-	// Update scene selector dropdown
-	updateSceneSelector(sceneType);
+switch (sceneType) {
+case 'particles':
+createParticlesGUI(settings, container, onChange);
+break;
+case 'skinning':
+createSkinningGUI(settings, container, onChange);
+break;
+case 'combi':
+createCombiGUI(settings, container, onChange);
+break;
+}
+
+// Update scene selector dropdown
+updateSceneSelector(sceneType);
 
 // Apply fade behavior to settings button
 applyFadeToSettingsButton();

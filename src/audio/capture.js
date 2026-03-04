@@ -16,6 +16,9 @@ let analyser = null;
 /** @type {Uint8Array|null} */
 let dataArray = null;
 
+/** @type {MediaStreamAudioSourceNode|null} */
+let audioSource = null;
+
 /** @type {Array<{id: string, name: string, thumbnail: string}>} */
 let audioSources = [];
 
@@ -108,21 +111,21 @@ async function initBrowserAudio() {
  * @returns {boolean} True if setup successful
  */
 function setupAudioContext(audioTrack) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    
-    if (audioContext.state === 'suspended') {
-        audioContext.resume();
-    }
-    
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.75;
-    
-    const source = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
-    source.connect(analyser);
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    
-    return true;
+audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+if (audioContext.state === 'suspended') {
+audioContext.resume();
+}
+
+analyser = audioContext.createAnalyser();
+analyser.fftSize = 512;
+analyser.smoothingTimeConstant = 0.75;
+
+audioSource = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+audioSource.connect(analyser);
+dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+return true;
 }
 
 /**
@@ -239,28 +242,45 @@ export function analyzeAudio(settings) {
  * @param {Error} err - The error that occurred
  */
 function handleAudioError(err) {
-    console.error('Audio error:', err);
-    if (err.name === 'NotAllowedError') {
-        setAudioError('Cancelled - click a scene to retry');
-    } else {
-        setAudioError(err.message);
-    }
+console.error('Audio error:', err);
+switch (err.name) {
+case 'NotAllowedError':
+setAudioError('Cancelled - click a scene to retry');
+break;
+case 'NotFoundError':
+setAudioError('No audio device found');
+break;
+case 'NotReadableError':
+setAudioError('Audio device in use by another app');
+break;
+case 'OverconstrainedError':
+setAudioError('Audio constraints not satisfied');
+break;
+default:
+setAudioError(err.message || 'Unknown audio error');
+}
 }
 
 /**
-* Close audio context and cleanup.
-*/
+ * Close audio context and cleanup.
+ */
 export function closeAudio() {
-	// Cleanup dummy audio oscillators first
-	cleanupDummyAudio();
+// Cleanup dummy audio oscillators first
+cleanupDummyAudio();
 
-	if (audioContext) {
-		audioContext.close();
-		audioContext = null;
-	}
-	analyser = null;
-	dataArray = null;
-	selectedAudioSource = null;
+// Disconnect audio source
+if (audioSource) {
+audioSource.disconnect();
+audioSource = null;
+}
+
+if (audioContext) {
+audioContext.close();
+audioContext = null;
+}
+analyser = null;
+dataArray = null;
+selectedAudioSource = null;
 }
 
 /**

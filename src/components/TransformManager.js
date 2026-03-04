@@ -27,37 +27,69 @@ export function createTransformManager(camera, domElement) {
         instances: [],
         /** @type {string|null} */
         selectedName: null,
-        /** @type {Object|null} */
-        orbitControls: null,
-        visible: false,
-    };
+/** @type {Object|null} */
+orbitControls: null,
+visible: false,
+/** @type {Function|null} */
+draggingChangedHandler: null,
+};
 
-    init();
+init();
 
-    function init() {
-        // Create transform controls
-        const transformControls = new TransformControls(camera, domElement);
-        transformControls.setMode('translate');
-        transformControls.visible = false;
-        transformControls.enabled = false;
+function init() {
+// Create transform controls
+const transformControls = new TransformControls(camera, domElement);
+transformControls.setMode('translate');
+transformControls.setSpace('world');
+transformControls.visible = false;
+transformControls.enabled = false;
 
-        // Get the helper (actual gizmo visualization)
-        const gizmoHelper = transformControls.getHelper();
-        gizmoHelper.visible = false;
+// Get the helper (actual gizmo visualization)
+const gizmoHelper = transformControls.getHelper();
+gizmoHelper.visible = false;
 
-        // Store references
-        state.transformControls = transformControls;
-        state.gizmoHelper = gizmoHelper;
+// Store references
+state.transformControls = transformControls;
+state.gizmoHelper = gizmoHelper;
 
-        // Setup dragging event
-        transformControls.addEventListener('dragging-changed', (event) => {
-            if (state.orbitControls) {
-                state.orbitControls.enabled = !event.value;
-            }
-        });
+// Setup dragging event - store handler for cleanup
+state.draggingChangedHandler = (event) => {
+if (state.orbitControls) {
+state.orbitControls.enabled = !event.value;
+}
+};
+transformControls.addEventListener('dragging-changed', state.draggingChangedHandler);
 
-        console.log('[TransformManager] Initialized');
+// Patch TransformControls to validate object before operations
+  const originalAttach = transformControls.attach.bind(transformControls);
+  transformControls.attach = function(object) {
+    if (!object || !object.parent) {
+      console.warn('[TransformManager] Cannot attach - object is null or not in scene');
+      return;
     }
+    originalAttach(object);
+  };
+
+  // Patch pointerDown to prevent errors when no object is attached
+  const originalPointerDown = transformControls.pointerDown.bind(transformControls);
+  transformControls.pointerDown = function(pointer) {
+    if (!this.object) {
+      return;
+    }
+    originalPointerDown(pointer);
+  };
+
+  // Patch pointerHover to prevent errors when no object is attached
+  const originalPointerHover = transformControls.pointerHover.bind(transformControls);
+  transformControls.pointerHover = function(pointer) {
+    if (!this.object) {
+      return;
+    }
+    originalPointerHover(pointer);
+  };
+
+  console.log('[TransformManager] Initialized');
+}
 
     /**
      * Set the orbit controls reference for disabling during gizmo drag
@@ -294,48 +326,62 @@ export function createTransformManager(camera, domElement) {
      * @param {string} name - Name of registered component or instance ID
      * @returns {boolean} True if selected successfully
      */
-    function select(name) {
-        // Check if it's an instance first
-        const instance = state.instances.find(item => item.instanceId === name);
-        if (instance) {
-            // Detach from previous
-            if (state.transformControls) {
-                state.transformControls.detach();
-            }
+function select(name) {
+// Check if it's an instance first
+const instance = state.instances.find(item => item.instanceId === name);
+if (instance && instance.group) {
+// Validate group is still in scene
+if (!instance.group.parent) {
+console.warn(`[TransformManager] Instance "${name}" group is not in scene`);
+state.instances = state.instances.filter(item => item.instanceId !== name);
+return false;
+}
 
-            // Attach to instance group
-            state.transformControls.attach(instance.group);
-            state.selectedName = name;
+// Detach from previous
+if (state.transformControls) {
+state.transformControls.detach();
+}
 
-            // Update visibility based on current state
-            updateVisibility();
+// Attach to instance group
+state.transformControls.attach(instance.group);
+state.selectedName = name;
 
-            console.log(`[TransformManager] Selected instance: ${name}`);
-            return true;
-        }
+// Update visibility based on current state
+updateVisibility();
 
-        // Fall back to registered component
-        const item = state.registered.find(item => item.name === name);
-        if (!item) {
-            console.warn(`[TransformManager] Cannot select "${name}" - not found`);
-            return false;
-        }
+console.log(`[TransformManager] Selected instance: ${name}`);
+return true;
+}
 
-        // Detach from previous
-        if (state.transformControls) {
-            state.transformControls.detach();
-        }
+// Fall back to registered component
+const item = state.registered.find(item => item.name === name);
+if (!item || !item.group) {
+console.warn(`[TransformManager] Cannot select "${name}" - not found or invalid group`);
+return false;
+}
 
-        // Attach to component group
-        state.transformControls.attach(item.group);
-        state.selectedName = name;
+// Validate group is still in scene
+if (!item.group.parent) {
+console.warn(`[TransformManager] Component "${name}" group is not in scene`);
+state.registered = state.registered.filter(i => i.name !== name);
+return false;
+}
 
-        // Update visibility based on current state
-        updateVisibility();
+// Detach from previous
+if (state.transformControls) {
+state.transformControls.detach();
+}
 
-        console.log(`[TransformManager] Selected component: ${name}`);
-        return true;
-    }
+// Attach to component group
+state.transformControls.attach(item.group);
+state.selectedName = name;
+
+// Update visibility based on current state
+updateVisibility();
+
+console.log(`[TransformManager] Selected component: ${name}`);
+return true;
+}
 
     /**
      * Deselect current component
@@ -368,17 +414,17 @@ export function createTransformManager(camera, domElement) {
     /**
      * Internal: update gizmo visibility based on state
      */
-    function updateVisibility() {
-        const hasSelection = state.selectedName !== null;
-        const shouldShow = state.visible && hasSelection;
+function updateVisibility() {
+const hasSelection = state.selectedName !== null;
+const shouldShow = state.visible && hasSelection;
 
-        if (state.gizmoHelper) {
-            state.gizmoHelper.visible = shouldShow;
-        }
-        if (state.transformControls) {
-            state.transformControls.enabled = shouldShow;
-        }
-    }
+if (state.gizmoHelper) {
+state.gizmoHelper.visible = shouldShow;
+}
+if (state.transformControls) {
+state.transformControls.enabled = shouldShow;
+}
+}
 
     /**
      * Get list of registered component names
@@ -388,64 +434,16 @@ export function createTransformManager(camera, domElement) {
         return state.registered.map(item => item.name);
     }
 
-    /**
-     * Get currently selected component name
-     * @returns {string|null}
-     */
-    function getSelectedName() {
-        return state.selectedName;
-    }
+/**
+ * Get currently selected component name
+ * @returns {string|null}
+ */
+function getSelectedName() {
+  return state.selectedName;
+}
 
-    /**
-     * Create an instance of a registered component
-     * @param {string} componentName - Name of registered component
-     * @param {THREE.Group} group - The group for this instance
-     * @param {number} index - Instance index
-     * @returns {string|null} Instance ID or null if failed
-     */
-    function createInstance(componentName, group, index) {
-        const registered = state.registered.find(item => item.name === componentName);
-        if (!registered) {
-            console.warn(`[TransformManager] Cannot create instance - component "${componentName}" not registered`);
-            return null;
-        }
-
-        const instanceId = `${componentName}_${index}`;
-        
-        // Check if instance already exists
-        if (state.instances.find(item => item.instanceId === instanceId)) {
-            console.warn(`[TransformManager] Instance "${instanceId}" already exists`);
-            return null;
-        }
-
-        // Store initial transform
-        const initialTransform = {
-            position: group.position.clone(),
-            rotation: group.rotation.clone(),
-            scale: group.scale.clone(),
-            quaternion: group.quaternion.clone(),
-        };
-
-        state.instances.push({
-            instanceId,
-            componentName,
-            group,
-            initialTransform,
-            index,
-        });
-
-        console.log(`[TransformManager] Created instance: ${instanceId}`);
-        
-        // Auto-select first instance
-        if (state.instances.length === 1) {
-            select(instanceId);
-        }
-        
-        return instanceId;
-    }
-
-    /**
-     * Remove an instance
+/**
+ * Remove an instance
      * @param {string} instanceId - Instance ID to remove
      */
     function removeInstance(instanceId) {
@@ -490,27 +488,33 @@ export function createTransformManager(camera, domElement) {
         return state.instances.map(item => item.instanceId);
     }
 
-    /**
-     * Cleanup and dispose all resources
-     */
-    function cleanup() {
-        // Dispose transform controls
-        if (state.transformControls) {
-            state.transformControls.dispose();
-            state.transformControls = null;
-        }
+/**
+ * Cleanup and dispose all resources
+ */
+function cleanup() {
+// Remove event listener
+if (state.transformControls && state.draggingChangedHandler) {
+state.transformControls.removeEventListener('dragging-changed', state.draggingChangedHandler);
+}
 
-        // Clear gizmo helper reference (scene should remove from graph)
-        state.gizmoHelper = null;
+// Dispose transform controls
+if (state.transformControls) {
+state.transformControls.dispose();
+state.transformControls = null;
+}
 
-        // Clear registered components
-        state.registered = [];
-        state.instances = [];
-        state.selectedName = null;
-        state.orbitControls = null;
+// Clear gizmo helper reference (scene should remove from graph)
+state.gizmoHelper = null;
 
-        console.log('[TransformManager] Cleanup complete');
-    }
+// Clear registered components
+state.registered = [];
+state.instances = [];
+state.selectedName = null;
+state.orbitControls = null;
+state.draggingChangedHandler = null;
+
+console.log('[TransformManager] Cleanup complete');
+}
 
     return {
         setOrbitControls,
