@@ -131,7 +131,9 @@ export async function initVisualization(options) {
 }
 
 /**
- * Main animation loop - shared across all versions
+ * Main animation loop - shared across all versions.
+ * Handles audio analysis, bloom updates, and scene rendering.
+ * @private
  */
 function animate() {
     const delta = getDelta();

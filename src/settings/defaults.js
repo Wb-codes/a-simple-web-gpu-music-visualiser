@@ -4,8 +4,6 @@
  * All settings are reactive and control visual parameters.
  */
 
-import { ANIMATION_NAMES, DEFAULT_ANIMATION } from '../core/animations.js';
-
 /**
  * @typedef {Object} NumberSetting
  * @property {number} value - Current value

@@ -86,7 +86,10 @@ function isMouseOverElement(element, clientX, clientY) {
 }
 
 /**
- * Global mouse move handler to check all faded elements
+ * Global mouse move handler to check all faded elements.
+ * Shows faded elements when hovered and starts fade timer when leaving.
+ * @param {MouseEvent} e - The mouse event
+ * @private
  */
 function handleGlobalMouseMove(e) {
   activeControllers.forEach((controller, key) => {
@@ -105,7 +108,9 @@ function handleGlobalMouseMove(e) {
 }
 
 /**
- * Start global mouse move listener
+ * Start global mouse move listener.
+ * Only attaches listener if not already active.
+ * @private
  */
 function startMouseListener() {
   if (!mouseListenerActive) {
@@ -115,7 +120,9 @@ function startMouseListener() {
 }
 
 /**
- * Stop global mouse move listener if no controllers active
+ * Stop global mouse move listener if no controllers active.
+ * Cleans up the global event listener when no elements need fade behavior.
+ * @private
  */
 function stopMouseListener() {
   if (mouseListenerActive && activeControllers.size === 0) {

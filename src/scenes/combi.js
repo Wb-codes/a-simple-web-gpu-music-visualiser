@@ -356,8 +356,13 @@ console.log('[Combi] Restored state:', combiScene.emitters.length, 'instances');
 }
 
 /**
-* Create a skinning point cloud from a mesh (reused from skinning scene)
-*/
+ * Create a skinning point cloud from a mesh (reused from skinning scene).
+ * Renders mesh vertices as audio-reactive points using TSL shaders.
+ * @param {THREE.Mesh} child - The mesh to convert to point cloud
+ * @param {THREE.WebGPURenderer} renderer - The WebGPU renderer
+ * @param {THREE.Scene} scene - The scene to add the point cloud to
+ * @returns {Object} Object containing sprite, positionArray, speedArray, positionBuffer, material, and dispose function
+ */
 function createCombiPointCloud(child, renderer, scene) {
 const countOfPoints = child.geometry.getAttribute('position').count;
 

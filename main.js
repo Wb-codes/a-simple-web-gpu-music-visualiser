@@ -22,15 +22,22 @@ let audioInitialized = false;
 
 // Auto-save settings when they change
 let saveTimeout = null;
+
+/**
+ * Schedule a save of settings to localStorage.
+ * Debounces rapid successive calls to avoid excessive writes.
+ */
 const scheduleSave = () => {
 if (saveTimeout) clearTimeout(saveTimeout);
 saveTimeout = setTimeout(() => saveSettings(settings), 500);
 };
 
 /**
-* Initialize the application with scene.
-* @param {string} sceneType - Scene type to initialize
-*/
+ * Initialize the application with a specific scene.
+ * Creates the visualization, sets up the GUI, and applies fade behaviors.
+ * @param {string} sceneType - Scene type to initialize ('particles', 'skinning', or 'combi')
+ * @throws {Error} If scene initialization fails
+ */
 async function init(sceneType) {
 console.log('[Main] Initializing scene:', sceneType);
 currentSceneType = sceneType;
@@ -62,8 +69,8 @@ createCombiGUI(settings, container, onChange);
 break;
 }
 
-// Hide scene indicator (using dropdown instead)
-	const indicator = document.getElementById('scene-indicator');
+ // Hide scene indicator (using dropdown instead)
+ const indicator = document.getElementById('scene-indicator');
 if (indicator) {
 indicator.style.display = 'none';
 }
@@ -113,16 +120,20 @@ if (sceneType === currentSceneType) return;
 
 console.log('Switching scene from', currentSceneType, 'to', sceneType);
 
-// Save combi state before switching away
-if (currentSceneType === 'combi') {
-const { getCombiTransforms, getCombiInstanceCount } = await import('./src/scenes/combi.js');
-if (getCombiTransforms) {
-settings.combiInstanceTransforms.value = getCombiTransforms();
-}
-if (getCombiInstanceCount) {
-settings.combiInstanceCount.value = getCombiInstanceCount();
-}
-}
+ // Save combi state before switching away
+ if (currentSceneType === 'combi') {
+ try {
+ const { getCombiTransforms, getCombiInstanceCount } = await import('./src/scenes/combi.js');
+ if (getCombiTransforms) {
+ settings.combiInstanceTransforms.value = getCombiTransforms();
+ }
+ if (getCombiInstanceCount) {
+ settings.combiInstanceCount.value = getCombiInstanceCount();
+ }
+ } catch (err) {
+ console.error('[Main] Failed to save combi state:', err);
+ }
+ }
 
 // Save current settings before switching
 saveSettings(settings);
@@ -143,11 +154,14 @@ if (app) {
 app.cleanup();
 }
 
-// Remove all fade behaviors from previous scene
-removeAllFadeBehaviors();
+ // Remove all fade behaviors from previous scene
+ removeAllFadeBehaviors();
 
-// Clear controls
-document.getElementById('controls').innerHTML = '';
+ // Clear controls
+ const controlsEl = document.getElementById('controls');
+ if (controlsEl) {
+  controlsEl.innerHTML = '';
+ }
 
 // Initialize new scene
 app = await initVisualization({
@@ -197,6 +211,10 @@ document.addEventListener('DOMContentLoaded', attachStartButtonHandler);
 attachStartButtonHandler();
 }
 
+/**
+ * Attach event handlers to the start button and overlay.
+ * Prevents duplicate handler attachment.
+ */
 function attachStartButtonHandler() {
 // Prevent duplicate handlers
 if (startButtonHandlersAttached) {
@@ -237,16 +255,16 @@ console.log('[Main] URL:', window.location.href);
 await startVisualizer();
 });
 
-// Also allow clicking the entire overlay (but not the button itself)
-startOverlay.addEventListener('click', async (e) => {
-// Only respond if clicking the overlay background or text elements, not interactive elements
-if (e.target === startOverlay || e.target.tagName === 'H1' || e.target.tagName === 'P') {
-e.preventDefault();
-e.stopPropagation();
-console.log('[Main] Overlay clicked');
-await startVisualizer();
-}
-});
+ // Also allow clicking the entire overlay (but not the button itself)
+ startOverlay.addEventListener('click', async (e) => {
+ // Only respond if clicking non-interactive elements, not buttons/inputs/links
+ if (!e.target.matches('button, input, select, a')) {
+ e.preventDefault();
+ e.stopPropagation();
+ console.log('[Main] Overlay clicked');
+ await startVisualizer();
+ }
+ });
 
 console.log('[Main] Start button handlers attached');
 }
@@ -261,7 +279,12 @@ startVisualizer();
 // Flag to prevent multiple simultaneous calls to startVisualizer
 let isStarting = false;
 
-// Auto-start for OBS Browser Source or when ?autostart=true
+/**
+ * Start the visualizer application.
+ * Hides the start overlay, initializes audio, and begins visualization.
+ * Handles OBS Browser Source mode and dummy audio fallback.
+ * Prevents multiple simultaneous calls.
+ */
 async function startVisualizer() {
 // Prevent multiple simultaneous executions
 if (isStarting) {
@@ -269,16 +292,22 @@ console.log('[Main] startVisualizer already running, skipping duplicate call');
 return;
 }
 
-if (audioInitialized) {
-console.log('[Main] Audio already initialized, just hiding overlay');
-document.getElementById('start-overlay').style.display = 'none';
-return;
-}
+ if (audioInitialized) {
+ console.log('[Main] Audio already initialized, just hiding overlay');
+ const overlayEl = document.getElementById('start-overlay');
+ if (overlayEl) {
+  overlayEl.style.display = 'none';
+ }
+ return;
+ }
 
-isStarting = true;
+ isStarting = true;
 
-try {
-document.getElementById('start-overlay').style.display = 'none';
+ try {
+ const overlayEl = document.getElementById('start-overlay');
+ if (overlayEl) {
+  overlayEl.style.display = 'none';
+ }
 
 // Check if we should use dummy audio
 const urlParams = new URLSearchParams(window.location.search);
