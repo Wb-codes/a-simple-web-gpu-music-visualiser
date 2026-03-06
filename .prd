@@ -1,7 +1,17 @@
 {
   "project": "music-visualizer",
-  "created": "2026-03-05",
-  "objective": "Fix code review issues in main.js: circular dependencies, missing null checks, event delegation, error handling, and indentation",
+  "created": "2026-03-06",
+  "objective": "Research TSL WebGPU shaders and implement them in a categorized library (procedural, emitter, post-process)",
   "items": [],
-  "completed": []
+  "completed": [
+    "research-tsl-basics",
+    "research-procedural-effects",
+    "research-emitter-effects",
+    "research-postprocess-effects",
+    "design-library-structure",
+    "implement-procedural-effects",
+    "implement-emitter-effects",
+    "implement-postprocess-effects",
+    "create-index-exports"
+  ]
 }

@@ -671,6 +671,145 @@ const pointSizeFolder = createFolder('Point Size', container);
 addSlider(pointSizeFolder.content, settings.pointSize, handleChange);
 addSlider(pointSizeFolder.content, settings.pointSizeAudio, handleChange);
 
+// Effects folder - apply procedural effects to point clouds
+const effectsFolder = createFolder('Effects', container);
+
+// Effect selector
+const effectRow = document.createElement('div');
+effectRow.className = 'control-row';
+effectRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+
+const effectLabel = document.createElement('label');
+effectLabel.textContent = 'Effect';
+effectLabel.style.cssText = 'color: #fff; font-size: 12px;';
+
+const effectSelect = document.createElement('select');
+effectSelect.style.cssText = 'background: #222; border: 1px solid #444; color: #fff; padding: 4px 8px; border-radius: 3px; flex: 1; margin-left: 8px;';
+
+const effectOptions = [
+  { value: '', label: 'None (Default)' },
+  { value: 'simplex', label: 'Simplex Noise' },
+  { value: 'perlin', label: 'Perlin Noise' },
+  { value: 'voronoi', label: 'Voronoi' },
+  { value: 'fbm', label: 'Fractal Brownian Motion' },
+  { value: 'wave', label: 'Wave Field' },
+  { value: 'ripple', label: 'Ripple' },
+  { value: 'spectral', label: 'Spectral Gradient' },
+  { value: 'noise-displace', label: 'Noise Displace' }
+];
+
+effectOptions.forEach(opt => {
+  const option = document.createElement('option');
+  option.value = opt.value;
+  option.textContent = opt.label;
+  effectSelect.appendChild(option);
+});
+
+effectSelect.onchange = () => {
+  import('../scenes/skinning.js').then(module => {
+    module.setPointCloudEffect(effectSelect.value || null);
+  });
+};
+
+effectRow.appendChild(effectLabel);
+effectRow.appendChild(effectSelect);
+effectsFolder.content.appendChild(effectRow);
+
+// Effect parameters
+const effectScaleRow = document.createElement('div');
+effectScaleRow.className = 'control-row';
+effectsFolder.content.appendChild(effectScaleRow);
+
+const effectScaleLabel = document.createElement('label');
+effectScaleLabel.textContent = 'Scale';
+
+const effectScaleInput = document.createElement('input');
+effectScaleInput.type = 'range';
+effectScaleInput.min = '0.1';
+effectScaleInput.max = '5';
+effectScaleInput.step = '0.1';
+effectScaleInput.value = '1';
+
+const effectScaleValue = document.createElement('span');
+effectScaleValue.className = 'value';
+effectScaleValue.textContent = '1.00';
+
+effectScaleInput.oninput = () => {
+  const val = parseFloat(effectScaleInput.value);
+  effectScaleValue.textContent = val.toFixed(2);
+  import('../scenes/skinning.js').then(module => {
+    module.updateEffectParams({ scale: val });
+  });
+};
+
+effectScaleRow.appendChild(effectScaleLabel);
+effectScaleRow.appendChild(effectScaleInput);
+effectScaleRow.appendChild(effectScaleValue);
+
+// Effect speed
+const effectSpeedRow = document.createElement('div');
+effectSpeedRow.className = 'control-row';
+effectsFolder.content.appendChild(effectSpeedRow);
+
+const effectSpeedLabel = document.createElement('label');
+effectSpeedLabel.textContent = 'Speed';
+
+const effectSpeedInput = document.createElement('input');
+effectSpeedInput.type = 'range';
+effectSpeedInput.min = '0';
+effectSpeedInput.max = '5';
+effectSpeedInput.step = '0.1';
+effectSpeedInput.value = '1';
+
+const effectSpeedValue = document.createElement('span');
+effectSpeedValue.className = 'value';
+effectSpeedValue.textContent = '1.00';
+
+effectSpeedInput.oninput = () => {
+  const val = parseFloat(effectSpeedInput.value);
+  effectSpeedValue.textContent = val.toFixed(2);
+  import('../scenes/skinning.js').then(module => {
+    module.updateEffectParams({ speed: val });
+  });
+};
+
+effectSpeedRow.appendChild(effectSpeedLabel);
+effectSpeedRow.appendChild(effectSpeedInput);
+effectSpeedRow.appendChild(effectSpeedValue);
+
+// Effect intensity
+const effectIntensityRow = document.createElement('div');
+effectIntensityRow.className = 'control-row';
+effectsFolder.content.appendChild(effectIntensityRow);
+
+const effectIntensityLabel = document.createElement('label');
+effectIntensityLabel.textContent = 'Intensity';
+
+const effectIntensityInput = document.createElement('input');
+effectIntensityInput.type = 'range';
+effectIntensityInput.min = '0';
+effectIntensityInput.max = '5';
+effectIntensityInput.step = '0.1';
+effectIntensityInput.value = '0.5';
+
+const effectIntensityValue = document.createElement('span');
+effectIntensityValue.className = 'value';
+effectIntensityValue.textContent = '0.50';
+
+effectIntensityInput.oninput = () => {
+  const val = parseFloat(effectIntensityInput.value);
+  effectIntensityValue.textContent = val.toFixed(2);
+  import('../scenes/skinning.js').then(module => {
+    module.updateEffectParams({ intensity: val });
+  });
+};
+
+effectIntensityRow.appendChild(effectIntensityLabel);
+effectIntensityRow.appendChild(effectIntensityInput);
+effectIntensityRow.appendChild(effectIntensityValue);
+
+container.appendChild(effectsFolder.folder);
+
 // Bloom folder
 const bloomFolder = createFolder('Bloom', container);
 addSlider(bloomFolder.content, settings.bloomIntensity, handleChange);

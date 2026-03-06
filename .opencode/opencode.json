@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "dataflow-architect": {
+      "description": "Enforces modular architecture and project vision for the music visualizer",
+      "mode": "subagent"
+    },
+    "auto-discovery-implementer": {
+      "description": "Implements auto-discovery system for effects, scenes, and GUI",
+      "mode": "subagent"
+    }
+  },
+  "default_agent": "plan"
+}

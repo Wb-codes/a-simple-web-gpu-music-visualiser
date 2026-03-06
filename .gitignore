@@ -33,3 +33,7 @@ musicvis.app
 .git
 .github
 .code-search/
+
+node_modules
+package.json
+bun.lock

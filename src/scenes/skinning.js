@@ -6,15 +6,69 @@
 
 import * as THREE from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { vec3, float, Fn, color, shapeCircle, instanceIndex, instancedArray, objectWorldMatrix, computeSkinning, instancedBufferAttribute, uniform } from 'three/tsl';
+import { vec3, float, Fn, color, shapeCircle, instanceIndex, instancedArray, objectWorldMatrix, computeSkinning, instancedBufferAttribute, uniform, positionLocal, positionWorld, sin, cos, hash, length } from 'three/tsl';
 import { audioBass, audioMid, audioHigh } from '../audio/uniforms.js';
 import { buildAnimationMapFromGLB, clearDynamicAnimations } from '../core/animations.js';
 import { updatePostProcessingScene } from '../core/renderer.js';
 import { setSharedAnimation } from './combi.js';
+import { SimplexNoise3D, PerlinNoise3D, VoronoiNoise, FractalBrownianMotion, WaveField, Ripple, GradientLinear, ColorUtils } from '../effects/procedural/index.js';
 
 // Point size uniforms
 const pointSizeBase = uniform(5);
 const pointSizeAudioMult = uniform(5);
+
+// Effect uniforms
+const effectScale = uniform(1.0);
+const effectSpeed = uniform(1.0);
+const effectIntensity = uniform(0.5);
+const effectTime = uniform(0);
+
+/**
+ * Update effect time uniform (call from animation loop)
+ * @param {number} delta - Time delta in seconds
+ */
+export function updateEffectTime(delta) {
+  effectTime.value += delta;
+}
+
+/** @type {string|null} */
+let currentEffect = null;
+
+/**
+ * Set the current effect for point clouds
+ * @param {string|null} effectName - Effect name or null for default
+ */
+export function setPointCloudEffect(effectName) {
+  currentEffect = effectName;
+  console.log('[Skinning] Effect set to:', effectName);
+  
+  // Update all loaded model materials
+  loadedModels.forEach((modelData) => {
+    modelData.gpuResources.forEach((resource) => {
+      if (resource.applyEffect) {
+        resource.applyEffect(effectName);
+      }
+    });
+  });
+}
+
+/**
+ * Get the current effect name
+ * @returns {string|null}
+ */
+export function getPointCloudEffect() {
+  return currentEffect;
+}
+
+/**
+ * Update effect parameters
+ * @param {Object} params - { scale, speed, intensity }
+ */
+export function updateEffectParams(params) {
+  if (params.scale !== undefined) effectScale.value = params.scale;
+  if (params.speed !== undefined) effectSpeed.value = params.speed;
+  if (params.intensity !== undefined) effectIntensity.value = params.intensity;
+}
 
 /**
 * Update point size uniforms
@@ -543,18 +597,131 @@ return objectWorldMatrix(child).mul(instancedBufferAttribute(positionBuffer));
 const pointCloud = new THREE.Sprite(materialPoints);
 pointCloud.count = countOfPoints;
 
-// Return sprite and resources for tracking
-return {
-sprite: pointCloud,
-positionArray: pointPositionArray,
-speedArray: pointSpeedArray,
-positionBuffer: positionBuffer,
-material: materialPoints,
+// Store original position node for effect application
+const basePositionNode = materialPoints.positionNode;
 
 /**
- * Cleanup function to dispose GPU resources
+ * Apply an effect to the point cloud material
+ * @param {string|null} effectName - Effect to apply
  */
-dispose: () => {
+function applyEffect(effectName) {
+  if (!effectName) {
+    // Reset to default
+    materialPoints.colorNode = pointSpeedAttribute.mul(.6).mix(
+      color(0x0066ff).mul(vec3(1.0).add(audioHigh.mul(0.5))),
+      color(0xff9000).mul(vec3(1.0).add(audioMid.mul(0.5)))
+    );
+    materialPoints.positionNode = basePositionNode;
+    return;
+  }
+
+  const time = effectTime.mul(effectSpeed);
+  
+  // Use world position for effects (more meaningful for point clouds)
+  const pos = positionWorld;
+  
+  // Helper for spectral colors
+  const spectralColor = (t) => {
+    const r = sin(t.add(float(0))).mul(0.5).add(0.5);
+    const g = sin(t.add(float(2.094))).mul(0.5).add(0.5);
+    const b = sin(t.add(float(4.189))).mul(0.5).add(0.5);
+    return vec3(r, g, b);
+  };
+  
+  switch (effectName) {
+    case 'simplex':
+      materialPoints.colorNode = spectralColor(pos.y.add(1).div(2).add(audioBass.mul(0.5)).add(time.mul(0.1)));
+      materialPoints.positionNode = basePositionNode;
+      break;
+      
+    case 'perlin':
+      materialPoints.colorNode = spectralColor(pos.x.add(pos.y).add(1).div(3).add(audioMid.mul(0.3)).add(time.mul(0.15)));
+      materialPoints.positionNode = basePositionNode;
+      break;
+      
+    case 'voronoi':
+      materialPoints.colorNode = spectralColor(sin(pos.x.mul(effectScale).add(time)).mul(0.5).add(0.5));
+      materialPoints.positionNode = basePositionNode;
+      break;
+      
+    case 'fbm':
+      materialPoints.colorNode = spectralColor(pos.z.add(1).div(2).mul(audioHigh.add(1)).add(time.mul(0.2)));
+      materialPoints.positionNode = basePositionNode;
+      break;
+      
+    case 'wave':
+      materialPoints.colorNode = spectralColor(
+        sin(pos.x.mul(effectScale).add(time))
+          .add(sin(pos.y.mul(effectScale).add(time.mul(0.7))))
+          .add(sin(pos.z.mul(effectScale).add(time.mul(0.5))))
+          .mul(0.33).add(0.5)
+      );
+      materialPoints.positionNode = Fn(() => {
+        const audioMod = float(1).add(audioBass.mul(2)).add(audioMid.mul(1)).add(audioHigh.mul(0.5));
+        const displacement = vec3(
+          sin(pos.y.mul(effectScale).add(time)).mul(effectIntensity.mul(5).mul(audioMod)),
+          cos(pos.x.mul(effectScale).add(time)).mul(effectIntensity.mul(5).mul(audioMod)),
+          sin(pos.z.mul(effectScale).add(time.mul(0.7))).mul(effectIntensity.mul(5).mul(audioMod))
+        );
+        return basePositionNode.add(displacement);
+      })();
+      break;
+      
+    case 'ripple':
+      materialPoints.colorNode = spectralColor(length(pos).mul(effectScale).add(time.mul(-1)).fract());
+      materialPoints.positionNode = Fn(() => {
+        const audioMod = float(1).add(audioBass.mul(3)).add(audioMid.mul(1.5)).add(audioHigh.mul(0.5));
+        const dist = length(pos);
+        const dir = pos.div(dist.add(0.001));
+        const ripple = sin(dist.mul(effectScale.mul(10)).sub(time)).mul(effectIntensity.mul(8).mul(audioMod));
+        return basePositionNode.add(dir.mul(ripple));
+      })();
+      break;
+      
+    case 'spectral':
+      materialPoints.colorNode = spectralColor(pos.y.add(1).div(2).add(audioBass.mul(0.3)).add(audioMid.mul(0.2)).add(audioHigh.mul(0.1)));
+      materialPoints.positionNode = basePositionNode;
+      break;
+      
+    case 'noise-displace':
+      materialPoints.colorNode = pointSpeedAttribute.mul(.6).mix(
+        color(0x0066ff).mul(vec3(1.0).add(audioHigh.mul(0.5))),
+        color(0xff9000).mul(vec3(1.0).add(audioMid.mul(0.5)))
+      );
+      materialPoints.positionNode = Fn(() => {
+        const audioMod = float(1).add(audioBass.mul(2.5)).add(audioMid.mul(1)).add(audioHigh.mul(0.5));
+        const displacement = vec3(
+          sin(pos.y.mul(effectScale.mul(2)).add(time)).mul(effectIntensity.mul(4).mul(audioMod)),
+          cos(pos.x.mul(effectScale.mul(2)).add(time.mul(1.3))).mul(effectIntensity.mul(4).mul(audioMod)),
+          sin(pos.z.mul(effectScale.mul(2)).add(time.mul(0.7))).mul(effectIntensity.mul(4).mul(audioMod))
+        );
+        return basePositionNode.add(displacement);
+      })();
+      break;
+       
+    default:
+      console.warn('[Skinning] Unknown effect:', effectName);
+  }
+}
+
+// Apply initial effect if set
+if (currentEffect) {
+  applyEffect(currentEffect);
+}
+
+// Return sprite and resources for tracking
+return {
+  sprite: pointCloud,
+  positionArray: pointPositionArray,
+  speedArray: pointSpeedArray,
+  positionBuffer: positionBuffer,
+  material: materialPoints,
+  applyEffect: applyEffect,
+
+  /**
+   * Cleanup function to dispose GPU resources
+   */
+  dispose: () => {
 // Dispose material
 if (materialPoints) {
 materialPoints.dispose();
@@ -692,6 +859,9 @@ skinningScene.scene.background = settings.greenScreen?.value ? skinningScene.gre
 if (settings.pointSize && settings.pointSizeAudio) {
 updatePointSettings(settings.pointSize.value, settings.pointSizeAudio.value);
 }
+
+// Update effect time
+updateEffectTime(delta);
 }
 
 /**
