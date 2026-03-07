@@ -12,7 +12,27 @@ import {
   toggleModel,
   isModelLoaded,
   getModelAnimations,
-  playModelAnimation
+  playModelAnimation,
+  setRenderMode,
+  getRenderMode,
+  setPlexusDistance,
+  getPlexusDistance,
+  setPlexusNoiseScale,
+  getPlexusNoiseScale,
+  setPlexusNoiseStrength,
+  getPlexusNoiseStrength,
+  setPlexusShellThickness,
+  getPlexusShellThickness,
+  setPlexusNoiseVariation,
+  getPlexusNoiseVariation,
+  setPlexusCycleEnabled,
+  getPlexusCycleEnabled,
+  setPlexusCycleSpeed,
+  getPlexusCycleSpeed,
+  setPlexusCycleFraction,
+  getPlexusCycleFraction,
+  setPlexusRandomSeed,
+  getPlexusRandomSeed
 } from '../scenes/skinning.js';
 import {
   loadCombiModel,
@@ -671,7 +691,213 @@ const pointSizeFolder = createFolder('Point Size', container);
 addSlider(pointSizeFolder.content, settings.pointSize, handleChange);
 addSlider(pointSizeFolder.content, settings.pointSizeAudio, handleChange);
 
-// Effects folder - apply procedural effects to point clouds
+// Render Mode folder
+const renderModeFolder = createFolder('Render Mode', container);
+
+const renderModeRow = document.createElement('div');
+renderModeRow.className = 'control-row';
+renderModeRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+
+const renderModeLabel = document.createElement('label');
+renderModeLabel.textContent = 'Mode';
+renderModeLabel.style.cssText = 'color: #fff; font-size: 12px;';
+
+const renderModeSelect = document.createElement('select');
+renderModeSelect.style.cssText = 'background: #222; border: 1px solid #444; color: #fff; padding: 4px 8px; border-radius: 3px; flex: 1; margin-left: 8px;';
+
+const renderModeOptions = [
+  { value: 'points', label: '● Points' },
+  { value: 'plexus', label: '◈ Plexus' }
+];
+
+renderModeOptions.forEach(opt => {
+  const option = document.createElement('option');
+  option.value = opt.value;
+  option.textContent = opt.label;
+  if (opt.value === getRenderMode()) option.selected = true;
+  renderModeSelect.appendChild(option);
+});
+
+renderModeSelect.onchange = () => {
+  setRenderMode(renderModeSelect.value);
+};
+
+renderModeRow.appendChild(renderModeLabel);
+renderModeRow.appendChild(renderModeSelect);
+renderModeFolder.content.appendChild(renderModeRow);
+
+// Connection Distance slider
+const plexusDistanceRow = document.createElement('div');
+plexusDistanceRow.className = 'control-row';
+plexusDistanceRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+
+const plexusDistanceLabel = document.createElement('label');
+plexusDistanceLabel.textContent = 'Connection Distance';
+plexusDistanceLabel.style.cssText = 'color: #fff; font-size: 12px;';
+
+const plexusDistanceInput = document.createElement('input');
+plexusDistanceInput.type = 'range';
+plexusDistanceInput.min = '3';
+plexusDistanceInput.max = '40';
+plexusDistanceInput.step = '0.5';
+plexusDistanceInput.value = getPlexusDistance().toString();
+plexusDistanceInput.style.cssText = 'background: #222; border: 1px solid #444; color: #fff; padding: 4px 8px; border-radius: 3px; flex: 1; margin-left: 8px;';
+
+const plexusDistanceValue = document.createElement('span');
+plexusDistanceValue.className = 'value';
+plexusDistanceValue.textContent = getPlexusDistance().toFixed(1);
+plexusDistanceValue.style.cssText = 'color: #00ffff; min-width: 30px; text-align: right;';
+
+plexusDistanceInput.oninput = () => {
+  const val = parseFloat(plexusDistanceInput.value);
+  plexusDistanceValue.textContent = val.toFixed(1);
+  setPlexusDistance(val);
+};
+
+plexusDistanceRow.appendChild(plexusDistanceLabel);
+plexusDistanceRow.appendChild(plexusDistanceInput);
+plexusDistanceRow.appendChild(plexusDistanceValue);
+renderModeFolder.content.appendChild(plexusDistanceRow);
+
+// Random Seed slider (regenerates point sampling)
+const plexusSeedRow = document.createElement('div');
+plexusSeedRow.className = 'control-row';
+plexusSeedRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+
+const plexusSeedLabel = document.createElement('label');
+plexusSeedLabel.textContent = 'Random Seed';
+plexusSeedLabel.style.cssText = 'color: #fff; font-size: 12px;';
+
+const plexusSeedInput = document.createElement('input');
+plexusSeedInput.type = 'range';
+plexusSeedInput.min = '0.0';
+plexusSeedInput.max = '1.0';
+plexusSeedInput.step = '0.01';
+plexusSeedInput.value = getPlexusRandomSeed().toFixed(2);
+plexusSeedInput.style.cssText = 'background: #222; border: 1px solid #444; color: #fff; padding: 4px 8px; border-radius: 3px; flex: 1; margin-left: 8px;';
+
+const plexusSeedValue = document.createElement('span');
+plexusSeedValue.className = 'value';
+plexusSeedValue.textContent = getPlexusRandomSeed().toFixed(2);
+plexusSeedValue.style.cssText = 'color: #00ffff; min-width: 30px; text-align: right;';
+
+plexusSeedInput.oninput = () => {
+  const val = parseFloat(plexusSeedInput.value);
+  plexusSeedValue.textContent = val.toFixed(2);
+  setPlexusRandomSeed(val);
+};
+
+plexusSeedRow.appendChild(plexusSeedLabel);
+plexusSeedRow.appendChild(plexusSeedInput);
+plexusSeedRow.appendChild(plexusSeedValue);
+renderModeFolder.content.appendChild(plexusSeedRow);
+
+// Add helper text for random seed
+const seedHelp = document.createElement('div');
+seedHelp.innerHTML = 'Changes seed to regenerate random point distribution';
+seedHelp.style.cssText = 'color: #888; font-size: 10px; padding: 4px 0 8px 0;';
+renderModeFolder.content.appendChild(seedHelp);
+
+// Divider
+const cycleDivider = document.createElement('div');
+cycleDivider.style.cssText = 'height: 1px; background: #444; margin: 8px 0;';
+renderModeFolder.content.appendChild(cycleDivider);
+
+// Cycle Enabled checkbox
+const plexusCycleEnabledRow = document.createElement('div');
+plexusCycleEnabledRow.className = 'control-row';
+plexusCycleEnabledRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+
+const plexusCycleEnabledLabel = document.createElement('label');
+plexusCycleEnabledLabel.textContent = 'Cycle Connections';
+plexusCycleEnabledLabel.style.cssText = 'color: #fff; font-size: 12px;';
+
+const plexusCycleEnabledInput = document.createElement('input');
+plexusCycleEnabledInput.type = 'checkbox';
+plexusCycleEnabledInput.checked = getPlexusCycleEnabled();
+plexusCycleEnabledInput.style.cssText = 'margin-left: 8px;';
+
+plexusCycleEnabledInput.onchange = () => {
+  setPlexusCycleEnabled(plexusCycleEnabledInput.checked);
+};
+
+plexusCycleEnabledRow.appendChild(plexusCycleEnabledLabel);
+plexusCycleEnabledRow.appendChild(plexusCycleEnabledInput);
+renderModeFolder.content.appendChild(plexusCycleEnabledRow);
+
+// Cycle Speed slider
+const plexusCycleSpeedRow = document.createElement('div');
+plexusCycleSpeedRow.className = 'control-row';
+plexusCycleSpeedRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+
+const plexusCycleSpeedLabel = document.createElement('label');
+plexusCycleSpeedLabel.textContent = 'Cycle Speed';
+plexusCycleSpeedLabel.style.cssText = 'color: #fff; font-size: 12px;';
+
+const plexusCycleSpeedInput = document.createElement('input');
+plexusCycleSpeedInput.type = 'range';
+plexusCycleSpeedInput.min = '0.1';
+plexusCycleSpeedInput.max = '5.0';
+plexusCycleSpeedInput.step = '0.1';
+plexusCycleSpeedInput.value = getPlexusCycleSpeed().toFixed(1);
+plexusCycleSpeedInput.style.cssText = 'background: #222; border: 1px solid #444; color: #fff; padding: 4px 8px; border-radius: 3px; flex: 1; margin-left: 8px;';
+
+const plexusCycleSpeedValue = document.createElement('span');
+plexusCycleSpeedValue.className = 'value';
+plexusCycleSpeedValue.textContent = getPlexusCycleSpeed().toFixed(1);
+plexusCycleSpeedValue.style.cssText = 'color: #00ffff; min-width: 30px; text-align: right;';
+
+plexusCycleSpeedInput.oninput = () => {
+  const val = parseFloat(plexusCycleSpeedInput.value);
+  plexusCycleSpeedValue.textContent = val.toFixed(1);
+  setPlexusCycleSpeed(val);
+};
+
+plexusCycleSpeedRow.appendChild(plexusCycleSpeedLabel);
+plexusCycleSpeedRow.appendChild(plexusCycleSpeedInput);
+plexusCycleSpeedRow.appendChild(plexusCycleSpeedValue);
+renderModeFolder.content.appendChild(plexusCycleSpeedRow);
+
+// Cycle Fraction slider
+const plexusCycleFractionRow = document.createElement('div');
+plexusCycleFractionRow.className = 'control-row';
+plexusCycleFractionRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+
+const plexusCycleFractionLabel = document.createElement('label');
+plexusCycleFractionLabel.textContent = 'Visible Fraction';
+plexusCycleFractionLabel.style.cssText = 'color: #fff; font-size: 12px;';
+
+const plexusCycleFractionInput = document.createElement('input');
+plexusCycleFractionInput.type = 'range';
+plexusCycleFractionInput.min = '0.1';
+plexusCycleFractionInput.max = '1.0';
+plexusCycleFractionInput.step = '0.05';
+plexusCycleFractionInput.value = getPlexusCycleFraction().toFixed(2);
+plexusCycleFractionInput.style.cssText = 'background: #222; border: 1px solid #444; color: #fff; padding: 4px 8px; border-radius: 3px; flex: 1; margin-left: 8px;';
+
+const plexusCycleFractionValue = document.createElement('span');
+plexusCycleFractionValue.className = 'value';
+plexusCycleFractionValue.textContent = getPlexusCycleFraction().toFixed(2);
+plexusCycleFractionValue.style.cssText = 'color: #00ffff; min-width: 30px; text-align: right;';
+
+plexusCycleFractionInput.oninput = () => {
+  const val = parseFloat(plexusCycleFractionInput.value);
+  plexusCycleFractionValue.textContent = val.toFixed(2);
+  setPlexusCycleFraction(val);
+};
+
+plexusCycleFractionRow.appendChild(plexusCycleFractionLabel);
+plexusCycleFractionRow.appendChild(plexusCycleFractionInput);
+plexusCycleFractionRow.appendChild(plexusCycleFractionValue);
+renderModeFolder.content.appendChild(plexusCycleFractionRow);
+
+// Add helper text
+const plexusDistanceHelp = document.createElement('div');
+plexusDistanceHelp.innerHTML = 'Lower = more connections<br>Increase to reduce lag';
+plexusDistanceHelp.style.cssText = 'color: #888; font-size: 10px; padding: 4px 0 8px 0;';
+renderModeFolder.content.appendChild(plexusDistanceHelp);
+
+container.appendChild(renderModeFolder.folder);
 const effectsFolder = createFolder('Effects', container);
 
 // Effect selector
